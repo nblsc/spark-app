@@ -1,6 +1,6 @@
 import os
 from dotenv import load_dotenv
-from flask import Flask, jsonify
+from flask import Flask, jsonify, send_from_directory
 from flask_login import LoginManager
 from flask_cors import CORS
 from config import DevelopmentConfig
@@ -10,50 +10,49 @@ load_dotenv()
 
 def create_app(config_name='development'):
     app = Flask(__name__)
-    
-    # Configuration
+
     if config_name == 'development':
         app.config.from_object(DevelopmentConfig)
     else:
         from config import ProductionConfig
         app.config.from_object(ProductionConfig)
-    
-    # CORS - Autorise le frontend à communiquer
+
     CORS(app, resources={r"/api/*": {"origins": ["http://localhost:3000", "http://localhost:8000"]}})
-    
-    # Initialiser les extensions
+
     db.init_app(app)
-    
+
     login_manager = LoginManager()
     login_manager.init_app(app)
     login_manager.login_view = 'auth.login'
-    
+
     @login_manager.user_loader
     def load_user(user_id):
         return User.query.get(int(user_id))
-    
-    # Créer les tables
+
     with app.app_context():
         db.create_all()
-    
-    # Route de test
+
     @app.route('/api/health', methods=['GET'])
     def health():
         return jsonify({'status': 'OK', 'message': 'Backend is running!'}), 200
-    
-    # Blueprints
+
+    @app.route('/index/', methods=['GET'])
+    def index():
+        frontend_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'frontend')
+        return send_from_directory(frontend_dir, 'index.html')
+
     from routes.auth import auth_bp
     from routes.profile import profile_bp
     from routes.discover import discover_bp
     from routes.matches import matches_bp
     from routes.messages import messages_bp
-    
+
     app.register_blueprint(auth_bp, url_prefix='/api/auth')
     app.register_blueprint(profile_bp, url_prefix='/api/profile')
     app.register_blueprint(discover_bp, url_prefix='/api/discover')
     app.register_blueprint(matches_bp, url_prefix='/api/matches')
     app.register_blueprint(messages_bp, url_prefix='/api/messages')
-    
+
     return app
 
 if __name__ == '__main__':
