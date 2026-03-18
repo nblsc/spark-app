@@ -1,201 +1,94 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Pulse - Dating App</title>
-  <meta name="description" content="Application de dating moderne" />
-  <!-- Fichiers locaux dans le même dossier -->
-  <link rel="stylesheet" href="style.css" />
-  <link rel="stylesheet" href="animations-advanced.css" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Spark</title>
+  <link href="https://fonts.googleapis.com/css2?family=Clash+Display:wght@400;600;700&family=Instrument+Serif:ital@0;1&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <div class="bg-orb orb-1"></div>
-  <div class="bg-orb orb-2"></div>
-  <div class="bg-grid"></div>
 
-  <header class="topbar glass">
-    <div class="brand">
-      <div class="brand-logo">❤</div>
-      <span>Pulse</span>
-    </div>
-
-    <nav class="nav">
-      <a href="#features">Features</a>
-      <a href="#how">Comment ça marche</a>
-      <a href="#preview">Aperçu</a>
-      <a href="#" id="goProfile">Profile</a>
-      <a href="#" id="goMatches">Matches</a>
-    </nav>
-
-    <div class="topbar-actions">
-      <button class="btn btn-secondary" id="checkApiBtn">Tester API</button>
-      <button class="btn btn-primary" id="startBtn">Commencer</button>
+  <!-- HEADER -->
+  <header>
+    <div class="logo">spark</div>
+    <div class="notes-badge" id="notesBadge" onclick="toggleNotesPanel()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+      </svg>
+      <span class="count" id="notesLeft">4</span> notes
     </div>
   </header>
 
-  <main>
-    <section class="hero container">
-      <div class="hero-text reveal">
-        <span class="badge">Dating app moderne</span>
-        <h1>Connecte-toi avec des personnes qui te correspondent vraiment.</h1>
-        <p>
-          Une interface élégante, rapide et pensée pour les vraies rencontres.
-          Swipe, match, messages et profils personnalisés.
-        </p>
+  <!-- CARD STACK -->
+  <div class="stack" id="stack">
+    <!-- Cards injectées par JS -->
+  </div>
 
-        <div class="hero-actions">
-          <button class="btn btn-primary btn-lg" id="heroStartBtn">Créer un compte</button>
-          <button class="btn btn-secondary btn-lg" id="heroDiscoverBtn">Découvrir</button>
-        </div>
+  <!-- EMPTY STATE -->
+  <div class="empty-state" id="emptyState">
+    <div class="empty-emoji">🌙</div>
+    <div class="empty-title">C'est tout pour aujourd'hui</div>
+    <div class="empty-sub">Reviens demain pour de nouveaux profils</div>
+  </div>
 
-        <div class="hero-stats">
-          <div class="stat glass">
-            <strong>12k+</strong>
-            <span>Profils actifs</span>
-          </div>
-          <div class="stat glass">
-            <strong>3.4k</strong>
-            <span>Matches cette semaine</span>
-          </div>
-          <div class="stat glass">
-            <strong>98%</strong>
-            <span>Expérience mobile</span>
-          </div>
-        </div>
+  <!-- ACTION BUTTONS -->
+  <div class="actions" id="actions">
+    <button class="action-btn btn-nope" onclick="swipeCard('left')" title="Passer">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#ff4d6d" stroke-width="2.5" stroke-linecap="round">
+        <line x1="18" y1="6" x2="6" y2="18"/>
+        <line x1="6" y1="6" x2="18" y2="18"/>
+      </svg>
+    </button>
+    <button class="action-btn btn-note" onclick="openNoteModal()" title="Envoyer une note" id="noteBtn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#ffd166" stroke-width="2.5" stroke-linecap="round">
+        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+      </svg>
+    </button>
+    <button class="action-btn btn-like" onclick="swipeCard('right')" title="Liker">
+      <svg viewBox="0 0 24 24" fill="white" stroke="none">
+        <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+      </svg>
+    </button>
+  </div>
+
+  <!-- NOTE MODAL -->
+  <div class="modal-overlay" id="modalOverlay" onclick="handleOverlayClick(event)">
+    <div class="modal">
+      <div class="modal-handle"></div>
+      <div class="modal-title" id="modalName">Envoyer une note à</div>
+      <div class="modal-sub" id="notesRemaining">Il te reste <strong>4</strong> notes aujourd'hui</div>
+      <textarea
+        class="note-textarea"
+        id="noteText"
+        placeholder="Dis quelque chose d'authentique..."
+        maxlength="200"
+      ></textarea>
+      <div class="char-count"><span id="charCount">0</span>/200</div>
+      <div class="modal-actions">
+        <button class="btn btn-cancel" onclick="closeModal()">Annuler</button>
+        <button class="btn btn-send" id="sendBtn" onclick="sendNote()">Envoyer avec le like ❤️</button>
       </div>
+    </div>
+  </div>
 
-      <div class="hero-visual reveal">
-        <div class="phone glass floating-card">
-          <div class="phone-top">
-            <span class="dot pink"></span>
-            <span class="dot purple"></span>
-            <span class="dot blue"></span>
-          </div>
-
-          <div class="profile-card">
-            <img
-              src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=900&q=80"
-              alt="Profil"
-            />
-            <div class="profile-info">
-              <h3>Lina, 24</h3>
-              <p>Paris • Coffee addict • Voyages • Design</p>
-            </div>
-          </div>
-
-          <div class="phone-actions">
-            <button class="circle-btn dislike">✕</button>
-            <button class="circle-btn superlike">★</button>
-            <button class="circle-btn like">❤</button>
-          </div>
-        </div>
+  <!-- NOTES PANEL -->
+  <div class="notes-panel" id="notesPanel">
+    <div class="panel-header">
+      <div class="panel-title">Notes envoyées</div>
+      <div class="panel-close" onclick="toggleNotesPanel()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <line x1="18" y1="6" x2="6" y2="18"/>
+          <line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
       </div>
-    </section>
+    </div>
+    <div id="notesList"></div>
+  </div>
 
-    <section id="features" class="section container">
-      <div class="section-head reveal">
-        <span class="badge">Features</span>
-        <h2>Tout ce qu’il faut pour lancer ton app</h2>
-      </div>
+  <!-- TOAST CONTAINER -->
+  <div class="toast-container" id="toastContainer"></div>
 
-      <div class="features-grid">
-        <article class="feature-card glass reveal">
-          <h3>Découverte</h3>
-          <p>Scroll de profils, cards modernes, interactions rapides.</p>
-        </article>
-
-        <article class="feature-card glass reveal">
-          <h3>Matches</h3>
-          <p>Vue dédiée aux connexions mutuelles avec notifications futures.</p>
-        </article>
-
-        <article class="feature-card glass reveal">
-          <h3>Messagerie</h3>
-          <p>Base prête pour intégrer les messages entre utilisateurs.</p>
-        </article>
-
-        <article class="feature-card glass reveal">
-          <h3>Profil</h3>
-          <p>Bio, photo, âge, localisation, préférences et édition du compte.</p>
-        </article>
-      </div>
-    </section>
-
-    <section id="how" class="section container">
-      <div class="section-head reveal">
-        <span class="badge">Comment ça marche</span>
-        <h2>3 étapes simples</h2>
-      </div>
-
-      <div class="steps">
-        <div class="step glass reveal">
-          <span>01</span>
-          <h3>Crée ton profil</h3>
-          <p>Ajoute photo, bio, âge et ce que tu recherches.</p>
-        </div>
-
-        <div class="step glass reveal">
-          <span>02</span>
-          <h3>Découvre</h3>
-          <p>Like les profils qui t’intéressent et filtre selon tes préférences.</p>
-        </div>
-
-        <div class="step glass reveal">
-          <span>03</span>
-          <h3>Match & message</h3>
-          <p>Quand c’est réciproque, la conversation peut commencer.</p>
-        </div>
-      </div>
-    </section>
-
-    <section id="preview" class="section container">
-      <div class="section-head reveal">
-        <span class="badge">Aperçu</span>
-        <h2>Prépare tes pages suivantes</h2>
-      </div>
-
-      <div class="preview-grid">
-        <a class="preview-card glass reveal" href="#" id="previewDiscover">
-          <h3>Discover</h3>
-          <p>Page pour swiper ou parcourir des profils.</p>
-        </a>
-
-        <a class="preview-card glass reveal" href="#" id="previewMatches">
-          <h3>Matches</h3>
-          <p>Liste de tes connexions mutuelles.</p>
-        </a>
-
-        <a class="preview-card glass reveal" href="#" id="previewMessages">
-          <h3>Messages</h3>
-          <p>Conversations en temps réel plus tard.</p>
-        </a>
-
-        <a class="preview-card glass reveal" href="#" id="previewProfile">
-          <h3>Profile</h3>
-          <p>Gestion et affichage du profil utilisateur.</p>
-        </a>
-      </div>
-    </section>
-
-    <section class="cta container">
-      <div class="cta-box glass reveal">
-        <h2>Ton frontend est prêt à évoluer.</h2>
-        <p>
-          Commence avec cette landing page puis ajoute les pages discover,
-          matches, messages et profile.
-        </p>
-        <div class="hero-actions">
-          <button class="btn btn-primary" id="ctaStartBtn">Lancer maintenant</button>
-          <button class="btn btn-secondary" id="ctaApiBtn">Vérifier backend</button>
-        </div>
-      </div>
-    </section>
-  </main>
-
-  <div class="toast" id="toast"></div>
-
-  <script src="api-config.js"></script>
-  <script src="script.js"></script>
+  <script src="app.js"></script>
 </body>
 </html>
