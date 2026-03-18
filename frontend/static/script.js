@@ -1,10 +1,7 @@
 // ─── STORAGE HELPERS ─────────────────────────────────────────────────────────
-// Simule une "base de données" partagée via localStorage
-// En production, ce serait remplacé par un vrai backend/API.
-
-const DB_USERS_KEY   = 'spark_users';    // tableau de tous les comptes
-const DB_SESSION_KEY = 'spark_session';  // email de l'utilisateur connecté
-const DB_STATE_KEY   = 'spark_state_';   // préfixe + email pour l'état perso
+const DB_USERS_KEY   = 'spark_users';
+const DB_SESSION_KEY = 'spark_session';
+const DB_STATE_KEY   = 'spark_state_';
 
 const CARD_COLORS = [
   "#2a1a2e","#1a2a1e","#2a1e18","#18202a","#162228","#221820",
@@ -60,21 +57,29 @@ function showError(id, msg) {
   document.getElementById(id).textContent = msg;
 }
 
-function doLogin() {
+async function doLogin() {
   const email    = document.getElementById('loginEmail').value.trim().toLowerCase();
   const password = document.getElementById('loginPassword').value;
 
   if (!email || !password) return showError('loginError', 'Remplis tous les champs.');
 
-  const users = dbGetUsers();
-  const user = users.find(u => u.email === email && u.password === password);
-  if (!user) return showError('loginError', 'Email ou mot de passe incorrect.');
+  try {
+    const res = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password })
+    });
+    const data = await res.json();
+    if (!res.ok) return showError('loginError', data.error || 'Erreur de connexion.');
 
-  dbSetSession(email);
-  startApp(user);
+    dbSetSession(email);
+    startApp(data.user);
+  } catch(e) {
+    showError('loginError', 'Impossible de contacter le serveur.');
+  }
 }
 
-function doRegister() {
+async function doRegister() {
   const name     = document.getElementById('regName').value.trim();
   const age      = parseInt(document.getElementById('regAge').value);
   const desc     = document.getElementById('regDesc').value.trim();
@@ -89,34 +94,34 @@ function doRegister() {
   if (password.length < 6)
     return showError('registerError', 'Le mot de passe doit faire au moins 6 caractères.');
 
-  const users = dbGetUsers();
-  if (users.find(u => u.email === email))
-    return showError('registerError', 'Cet email est déjà utilisé.');
-
   const tags = tagsRaw
     ? tagsRaw.split(',').map(t => t.trim()).filter(Boolean).slice(0, 5)
     : [];
 
-  const colorIdx = users.length % CARD_COLORS.length;
-  const emojiIdx = users.length % CARD_EMOJIS.length;
+  try {
+    const res = await fetch('/api/auth/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: name, email, password, age, bio: desc })
+    });
+    const data = await res.json();
+    if (!res.ok) return showError('registerError', data.error || "Erreur lors de l'inscription.");
 
-  const newUser = {
-    id: Date.now(),
-    name,
-    age,
-    desc,
-    tags,
-    email,
-    password,
-    color: CARD_COLORS[colorIdx],
-    emoji: CARD_EMOJIS[emojiIdx],
-  };
+    const user = {
+      ...data.user,
+      name: data.user.username,
+      desc: data.user.bio,
+      tags,
+      color: CARD_COLORS[Math.floor(Math.random() * CARD_COLORS.length)],
+      emoji: CARD_EMOJIS[Math.floor(Math.random() * CARD_EMOJIS.length)],
+    };
 
-  users.push(newUser);
-  dbSaveUsers(users);
-  dbSetSession(email);
-  startApp(newUser);
-  showToast(`Bienvenue ${name} ! 🎉`, 'success');
+    dbSetSession(email);
+    startApp(user);
+    showToast(`Bienvenue ${name} ! 🎉`, 'success');
+  } catch(e) {
+    showError('registerError', 'Impossible de contacter le serveur.');
+  }
 }
 
 function doLogout() {
@@ -135,7 +140,6 @@ function startApp(user) {
   document.getElementById('authScreen').classList.add('hidden');
   document.getElementById('appScreen').classList.remove('hidden');
 
-  // Init state
   const today = new Date().toDateString();
   state = dbGetState(user.email) || {
     date: today,
@@ -154,7 +158,6 @@ let state = {};
 
 function buildDeck() {
   const users = dbGetUsers();
-  // Exclure le profil de l'utilisateur connecté
   const others = users.filter(u => u.email !== currentUser.email);
   deck = others.slice(state.deckIndex);
 }
@@ -417,7 +420,6 @@ document.getElementById('noteText').addEventListener('input', function () {
   document.getElementById('sendBtn').disabled = len < 2;
 });
 
-// Permettre Enter sur les champs login/register
 document.addEventListener('keydown', function(e) {
   if (e.key !== 'Enter') return;
   if (!document.getElementById('authScreen').classList.contains('hidden')) {
