@@ -60,9 +60,7 @@ function showError(id, msg) {
 async function doLogin() {
   const email    = document.getElementById('loginEmail').value.trim().toLowerCase();
   const password = document.getElementById('loginPassword').value;
-
   if (!email || !password) return showError('loginError', 'Remplis tous les champs.');
-
   try {
     const res = await fetch('/api/auth/login', {
       method: 'POST',
@@ -71,7 +69,6 @@ async function doLogin() {
     });
     const data = await res.json();
     if (!res.ok) return showError('loginError', data.error || 'Erreur de connexion.');
-
     dbSetSession(email);
     startApp(data.user);
   } catch(e) {
@@ -115,7 +112,6 @@ async function doRegister() {
       color: CARD_COLORS[Math.floor(Math.random() * CARD_COLORS.length)],
       emoji: CARD_EMOJIS[Math.floor(Math.random() * CARD_EMOJIS.length)],
     };
-
     dbSetSession(email);
     startApp(user);
     showToast(`Bienvenue ${name} ! 🎉`, 'success');
@@ -140,16 +136,25 @@ function startApp(user) {
   document.getElementById('authScreen').classList.add('hidden');
   document.getElementById('appScreen').classList.remove('hidden');
 
-  const today = new Date().toDateString();
+  const todayStr = new Date().toDateString();
   state = dbGetState(user.email) || {
-    date: today,
+    date: todayStr,
     notesLeft: 4,
     deckIndex: 0,
     sentNotes: [],
   };
 
+  if (state.date !== todayStr) {
+    state.notesLeft = 4;
+    state.date = todayStr;
+    state.deckIndex = 0;
+    dbSaveState(user.email, state);
+  }
+
   buildDeck();
   renderDeck();
+  updateNotesUI();
+  fetchUnreadCount();
 }
 
 // ─── DECK ─────────────────────────────────────────────────────────────────────
@@ -167,7 +172,6 @@ function buildCard(profile) {
   const card = document.createElement('div');
   card.className = 'card';
   card.dataset.id = profile.id;
-
   card.innerHTML = `
     <div style="width:100%;height:100%;background:linear-gradient(160deg,${profile.color} 0%,#0c0c0f 100%);display:flex;align-items:center;justify-content:center;font-size:120px;filter:saturate(0.8);">
       ${profile.emoji}
@@ -206,7 +210,6 @@ function renderDeck() {
     actionsEl.style.pointerEvents = 'none';
     return;
   }
-
   if (deck.length === 0) {
     emptyEl.classList.add('show');
     actionsEl.style.opacity = '0.3';
@@ -228,10 +231,12 @@ function renderDeck() {
 function updateNotesUI() {
   document.getElementById('notesLeft').textContent = state.notesLeft;
   const badge = document.getElementById('notesBadge');
-  badge.classList.toggle('pulse', state.notesLeft < 4);
+  if (badge) badge.classList.toggle('pulse', state.notesLeft < 4);
   const noteBtn = document.getElementById('noteBtn');
-  noteBtn.style.opacity = state.notesLeft > 0 ? '1' : '0.35';
-  noteBtn.style.pointerEvents = state.notesLeft > 0 ? 'all' : 'none';
+  if (noteBtn) {
+    noteBtn.style.opacity = state.notesLeft > 0 ? '1' : '0.35';
+    noteBtn.style.pointerEvents = state.notesLeft > 0 ? 'all' : 'none';
+  }
 }
 
 // ─── DRAG ────────────────────────────────────────────────────────────────────
@@ -252,7 +257,6 @@ function onDragStart(e) {
   isDragging = true;
   activeCard = document.querySelector('#stack .card:first-child');
   activeCard.style.transition = 'none';
-
   document.addEventListener('mousemove', onDragMove);
   document.addEventListener('mouseup', onDragEnd);
   document.addEventListener('touchmove', onDragMove, { passive: false });
@@ -262,18 +266,14 @@ function onDragStart(e) {
 function onDragMove(e) {
   if (!isDragging || !activeCard) return;
   if (e.cancelable) e.preventDefault();
-
   const clientX = e.type === 'touchmove' ? e.touches[0].clientX : e.clientX;
   currentX = clientX - startX;
-
   const rotate = currentX * 0.08;
   const lift = Math.abs(currentX) * 0.05;
   activeCard.style.transform = `translateX(${currentX}px) rotate(${rotate}deg) translateY(${-lift}px)`;
-
   const THRESHOLD = 60;
   const likeEl = activeCard.querySelector('.indicator.like');
   const nopeEl = activeCard.querySelector('.indicator.nope');
-
   if (currentX > THRESHOLD) {
     likeEl.style.opacity = Math.min((currentX - THRESHOLD) / 80, 1);
     nopeEl.style.opacity = 0;
@@ -291,10 +291,8 @@ function onDragEnd() {
   document.removeEventListener('mouseup', onDragEnd);
   document.removeEventListener('touchmove', onDragMove);
   document.removeEventListener('touchend', onDragEnd);
-
   if (!activeCard || !isDragging) return;
   isDragging = false;
-
   if (currentX > 100) {
     flyOut('right');
   } else if (currentX < -100) {
@@ -319,6 +317,13 @@ function flyOut(direction) {
 
   if (direction === 'right') {
     showToast(`Tu as liké ${topCardProfile.name} ❤️`, 'success');
+    fetch('/api/matches/like', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ liked_user_id: topCardProfile.id })
+    }).then(res => res.json()).then(data => {
+      if (data.matched) showToast(`🎉 Match avec ${topCardProfile.name} !`, 'success');
+    }).catch(() => {});
   } else {
     showToast('Profil suivant →', 'info');
   }
@@ -342,7 +347,6 @@ function swipeCard(direction) {
 function openNoteModal() {
   if (state.notesLeft <= 0) { showToast("Plus de notes disponibles aujourd'hui", 'error'); return; }
   if (deck.length === 0) return;
-
   document.getElementById('modalName').textContent = `Note pour ${topCardProfile.name}`;
   document.getElementById('notesRemaining').innerHTML =
     `Il te reste <strong>${state.notesLeft}</strong> note${state.notesLeft > 1 ? 's' : ''} aujourd'hui`;
@@ -360,9 +364,19 @@ function handleOverlayClick(e) {
   if (e.target === document.getElementById('modalOverlay')) closeModal();
 }
 
-function sendNote() {
+async function sendNote() {
   const text = document.getElementById('noteText').value.trim();
   if (!text || state.notesLeft <= 0) return;
+
+  try {
+    await fetch('/api/messages/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ receiver_id: topCardProfile.id, content: text })
+    });
+  } catch(e) {
+    console.error('Erreur envoi message:', e);
+  }
 
   const note = {
     to: topCardProfile.name,
@@ -374,7 +388,6 @@ function sendNote() {
   state.notesLeft--;
   state.sentNotes.unshift(note);
   dbSaveState(currentUser.email, state);
-
   closeModal();
   showToast(`Note envoyée à ${note.to} 💌`, 'success');
   setTimeout(() => swipeCard('right'), 300);
@@ -401,6 +414,106 @@ function renderNotesList() {
       <div class="note-item-time">${n.time}</div>
     </div>
   `).join('');
+}
+
+// ─── NAVIGATION ──────────────────────────────────────────────────────────────
+function showSwipeScreen() {
+  document.getElementById('notesPanel').classList.remove('open');
+  document.getElementById('matchesPanel').classList.remove('open');
+  document.getElementById('profilePanel').classList.remove('open');
+  document.getElementById('navSwipeBtn').classList.add('active');
+  document.getElementById('navMatchesBtn').classList.remove('active');
+  document.getElementById('navProfileBtn').classList.remove('active');
+}
+
+function toggleMatchesPanel() {
+  const panel = document.getElementById('matchesPanel');
+  const isOpen = panel.classList.contains('open');
+  document.getElementById('notesPanel').classList.remove('open');
+  document.getElementById('profilePanel').classList.remove('open');
+  panel.classList.toggle('open', !isOpen);
+  if (!isOpen) renderMatchesList();
+  document.getElementById('navMatchesBtn').classList.toggle('active', !isOpen);
+  document.getElementById('navProfileBtn').classList.remove('active');
+  document.getElementById('navSwipeBtn').classList.remove('active');
+}
+
+function toggleProfilePanel() {
+  const panel = document.getElementById('profilePanel');
+  const isOpen = panel.classList.contains('open');
+  document.getElementById('notesPanel').classList.remove('open');
+  document.getElementById('matchesPanel').classList.remove('open');
+  panel.classList.toggle('open', !isOpen);
+  if (!isOpen) renderProfilePanel();
+  document.getElementById('navProfileBtn').classList.toggle('active', !isOpen);
+  document.getElementById('navMatchesBtn').classList.remove('active');
+  document.getElementById('navSwipeBtn').classList.remove('active');
+}
+
+function renderMatchesList() {
+  const list = document.getElementById('matchesList');
+  const users = dbGetUsers();
+  const likedIds = (state.sentNotes || []).map(n => n.toId);
+  const matches = users.filter(u => likedIds.includes(u.id));
+  if (matches.length === 0) {
+    list.innerHTML = '<div class="no-notes">Aucun match pour l\'instant 💫</div>';
+    return;
+  }
+  list.innerHTML = matches.map(u => `
+    <div class="match-item">
+      <div class="match-avatar">${u.emoji || '👤'}</div>
+      <div class="match-info">
+        <div class="match-name">${u.name}</div>
+        <div class="match-sub">${u.age} ans</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function renderProfilePanel() {
+  const content = document.getElementById('profileContent');
+  if (!currentUser) return;
+  content.innerHTML = `
+    <div class="profile-avatar">${currentUser.emoji || '👤'}</div>
+    <div class="profile-name">${currentUser.name || currentUser.username}</div>
+    <div class="profile-age">${currentUser.age} ans</div>
+    <div class="profile-section">
+      <div class="profile-section-label">À propos</div>
+      <div class="profile-section-value">${currentUser.desc || currentUser.bio || '—'}</div>
+    </div>
+    <div class="profile-section">
+      <div class="profile-section-label">Email</div>
+      <div class="profile-section-value">${currentUser.email}</div>
+    </div>
+    <div class="profile-section">
+      <div class="profile-section-label">Centres d'intérêt</div>
+      <div class="profile-section-value">
+        <div class="card-tags" style="margin-top:0">
+          ${(currentUser.tags || []).map(t => `<span class="tag">${t}</span>`).join('') || '—'}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// ─── UNREAD COUNT ─────────────────────────────────────────────────────────────
+async function fetchUnreadCount() {
+  try {
+    const res = await fetch('/api/messages/unread');
+    const data = await res.json();
+    const count = data.count || 0;
+    const matchesBtn = document.getElementById('navMatchesBtn');
+    let dot = matchesBtn.querySelector('.notif-dot');
+    if (count > 0) {
+      if (!dot) {
+        dot = document.createElement('span');
+        dot.className = 'notif-dot';
+        matchesBtn.appendChild(dot);
+      }
+    } else {
+      if (dot) dot.remove();
+    }
+  } catch(e) {}
 }
 
 // ─── TOAST ───────────────────────────────────────────────────────────────────
