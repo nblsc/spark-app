@@ -13,13 +13,14 @@ def create_app(config_name='development'):
                 template_folder='../frontend/templates',
                 static_folder='../frontend/static')
 
-    if config_name == 'development':
-        app.config.from_object(DevelopmentConfig)
-    else:
+    env = os.getenv('FLASK_ENV', 'development')
+    if env == 'production':
         from config import ProductionConfig
         app.config.from_object(ProductionConfig)
+    else:
+        app.config.from_object(DevelopmentConfig)
 
-    CORS(app, resources={r"/api/*": {"origins": ["http://localhost:3000", "http://localhost:8000"]}})
+    CORS(app, resources={r"/api/*": {"origins": "*"}})
 
     db.init_app(app)
 
