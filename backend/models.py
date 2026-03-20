@@ -21,6 +21,7 @@ class User(UserMixin, db.Model):
     gender = db.Column(db.String(50))
     looking_for = db.Column(db.String(50))
     location = db.Column(db.String(200))
+    tags = db.Column(db.String(500))
     
     # Photos
     profile_photo = db.Column(db.String(500))
@@ -60,6 +61,7 @@ class User(UserMixin, db.Model):
             'looking_for': self.looking_for,
             'location': self.location,
             'profile_photo': self.profile_photo,
+            'tags': self.tags.split(',') if self.tags else [],
             'created_at': self.created_at.isoformat()
         }
     

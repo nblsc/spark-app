@@ -99,7 +99,7 @@ async function doRegister() {
     const res = await fetch('/api/auth/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username: name, email, password, age, bio: desc })
+      body: JSON.stringify({ username: name, email, password, age, bio: desc, tags })
     });
     const data = await res.json();
     if (!res.ok) return showError('registerError', data.error || "Erreur lors de l'inscription.");
@@ -108,7 +108,7 @@ async function doRegister() {
       ...data.user,
       name: data.user.username,
       desc: data.user.bio,
-      tags,
+      tags: data.user.tags || tags,
       color: CARD_COLORS[Math.floor(Math.random() * CARD_COLORS.length)],
       emoji: CARD_EMOJIS[Math.floor(Math.random() * CARD_EMOJIS.length)],
     };
@@ -145,6 +145,7 @@ async function startApp(user) {
         ...data.user,
         name: data.user.username,
         desc: data.user.bio || '',
+        tags: data.user.tags || [],
       };
     }
   } catch(e) {}
@@ -184,7 +185,7 @@ async function buildDeck() {
       ...u,
       name: u.username,
       desc: u.bio || '',
-      tags: [],
+      tags: u.tags || [],
       color: CARD_COLORS[u.id % CARD_COLORS.length],
       emoji: CARD_EMOJIS[u.id % CARD_EMOJIS.length],
     }));
@@ -579,7 +580,7 @@ async function saveProfile() {
     const res = await fetch('/api/profile/update', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ age, bio, email })
+      body: JSON.stringify({ age, bio, email, tags })
     });
     const data = await res.json();
     if (!res.ok) {
