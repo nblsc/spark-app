@@ -131,7 +131,7 @@ function doLogout() {
   switchTab('login');
 }
 
-function startApp(user) {
+async function startApp(user) {
   currentUser = user;
   document.getElementById('authScreen').classList.add('hidden');
   document.getElementById('appScreen').classList.remove('hidden');
@@ -151,7 +151,7 @@ function startApp(user) {
     dbSaveState(user.email, state);
   }
 
-  buildDeck();
+  await buildDeck();
   renderDeck();
   updateNotesUI();
   fetchUnreadCount();
@@ -161,10 +161,24 @@ function startApp(user) {
 let deck = [];
 let state = {};
 
-function buildDeck() {
-  const users = dbGetUsers();
-  const others = users.filter(u => u.email !== currentUser.email);
-  deck = others.slice(state.deckIndex);
+async function buildDeck() {
+  try {
+    const res = await fetch('/api/discover/');
+    const data = await res.json();
+    if (!res.ok) { deck = []; return; }
+
+    deck = data.users.map(u => ({
+      ...u,
+      name: u.username,
+      desc: u.bio || '',
+      tags: [],
+      color: CARD_COLORS[u.id % CARD_COLORS.length],
+      emoji: CARD_EMOJIS[u.id % CARD_EMOJIS.length],
+    }));
+  } catch(e) {
+    console.error('Erreur chargement profils:', e);
+    deck = [];
+  }
 }
 
 // ─── RENDER ──────────────────────────────────────────────────────────────────
@@ -172,10 +186,13 @@ function buildCard(profile) {
   const card = document.createElement('div');
   card.className = 'card';
   card.dataset.id = profile.id;
+
+  const cardBg = profile.profile_photo
+    ? `<img src="${profile.profile_photo}" style="width:100%;height:100%;object-fit:cover;" />`
+    : `<div style="width:100%;height:100%;background:linear-gradient(160deg,${profile.color} 0%,#0c0c0f 100%);display:flex;align-items:center;justify-content:center;font-size:120px;filter:saturate(0.8);">${profile.emoji}</div>`;
+
   card.innerHTML = `
-    <div style="width:100%;height:100%;background:linear-gradient(160deg,${profile.color} 0%,#0c0c0f 100%);display:flex;align-items:center;justify-content:center;font-size:120px;filter:saturate(0.8);">
-      ${profile.emoji}
-    </div>
+    ${cardBg}
     <div class="card-gradient"></div>
     <div class="indicator like">SPARK ✦</div>
     <div class="indicator nope">NOPE</div>
@@ -185,7 +202,7 @@ function buildCard(profile) {
       </div>
       <div class="card-desc">${profile.desc}</div>
       <div class="card-tags">
-        ${profile.tags.map(t => `<span class="tag">${t}</span>`).join('')}
+        ${(profile.tags || []).map(t => `<span class="tag">${t}</span>`).join('')}
       </div>
     </div>
   `;
@@ -202,16 +219,8 @@ function renderDeck() {
   emptyEl.classList.remove('show');
   noUsersEl.classList.remove('show');
 
-  const users = dbGetUsers().filter(u => u.email !== currentUser.email);
-
-  if (users.length === 0) {
-    noUsersEl.classList.add('show');
-    actionsEl.style.opacity = '0.3';
-    actionsEl.style.pointerEvents = 'none';
-    return;
-  }
   if (deck.length === 0) {
-    emptyEl.classList.add('show');
+    noUsersEl.classList.add('show');
     actionsEl.style.opacity = '0.3';
     actionsEl.style.pointerEvents = 'none';
     return;
@@ -330,7 +339,6 @@ function flyOut(direction) {
 
   setTimeout(() => {
     deck.shift();
-    state.deckIndex++;
     dbSaveState(currentUser.email, state);
     renderDeck();
   }, 400);
@@ -450,50 +458,142 @@ function toggleProfilePanel() {
   document.getElementById('navSwipeBtn').classList.remove('active');
 }
 
-function renderMatchesList() {
+async function renderMatchesList() {
   const list = document.getElementById('matchesList');
-  const users = dbGetUsers();
-  const likedIds = (state.sentNotes || []).map(n => n.toId);
-  const matches = users.filter(u => likedIds.includes(u.id));
-  if (matches.length === 0) {
-    list.innerHTML = '<div class="no-notes">Aucun match pour l\'instant 💫</div>';
-    return;
-  }
-  list.innerHTML = matches.map(u => `
-    <div class="match-item">
-      <div class="match-avatar">${u.emoji || '👤'}</div>
-      <div class="match-info">
-        <div class="match-name">${u.name}</div>
-        <div class="match-sub">${u.age} ans</div>
+  list.innerHTML = '<div class="no-notes">Chargement...</div>';
+
+  try {
+    const res = await fetch('/api/matches/');
+    const data = await res.json();
+    if (!res.ok || data.matches.length === 0) {
+      list.innerHTML = '<div class="no-notes">Aucun match pour l\'instant 💫</div>';
+      return;
+    }
+    list.innerHTML = data.matches.map(u => `
+      <div class="match-item">
+        <div class="match-avatar">${u.profile_photo
+          ? `<img src="${u.profile_photo}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />`
+          : (CARD_EMOJIS[u.id % CARD_EMOJIS.length])
+        }</div>
+        <div class="match-info">
+          <div class="match-name">${u.username}</div>
+          <div class="match-sub">${u.age} ans</div>
+        </div>
       </div>
-    </div>
-  `).join('');
+    `).join('');
+  } catch(e) {
+    list.innerHTML = '<div class="no-notes">Erreur de chargement.</div>';
+  }
 }
 
 function renderProfilePanel() {
   const content = document.getElementById('profileContent');
   if (!currentUser) return;
+
+  const photo = currentUser.profile_photo
+    ? `<img src="${currentUser.profile_photo}" alt="photo" />`
+    : (currentUser.emoji || '👤');
+
   content.innerHTML = `
-    <div class="profile-avatar">${currentUser.emoji || '👤'}</div>
+    <div class="profile-avatar-wrapper">
+      <div class="profile-avatar" onclick="document.getElementById('photoInput').click()">
+        ${photo}
+      </div>
+      <div class="profile-photo-label">✏️</div>
+      <input type="file" id="photoInput" class="profile-photo-upload" accept="image/*" onchange="handlePhotoUpload(event)" />
+    </div>
     <div class="profile-name">${currentUser.name || currentUser.username}</div>
     <div class="profile-age">${currentUser.age} ans</div>
     <div class="profile-section">
+      <div class="profile-section-label">Âge</div>
+      <input class="profile-edit-input" type="number" id="editAge" value="${currentUser.age || ''}" min="18" max="99" placeholder="Ton âge" />
+    </div>
+    <div class="profile-section">
       <div class="profile-section-label">À propos</div>
-      <div class="profile-section-value">${currentUser.desc || currentUser.bio || '—'}</div>
+      <textarea class="profile-edit-input" id="editBio" rows="3" placeholder="Ta description...">${currentUser.desc || currentUser.bio || ''}</textarea>
+    </div>
+    <div class="profile-section">
+      <div class="profile-section-label">Centres d'intérêt <span style="color:var(--muted);font-size:11px">(séparés par des virgules)</span></div>
+      <input class="profile-edit-input" type="text" id="editTags" value="${(currentUser.tags || []).join(', ')}" placeholder="Musique, Voyage, Tech" />
     </div>
     <div class="profile-section">
       <div class="profile-section-label">Email</div>
-      <div class="profile-section-value">${currentUser.email}</div>
+      <input class="profile-edit-input" type="email" id="editEmail" value="${currentUser.email || ''}" placeholder="toi@email.com" />
     </div>
-    <div class="profile-section">
-      <div class="profile-section-label">Centres d'intérêt</div>
-      <div class="profile-section-value">
-        <div class="card-tags" style="margin-top:0">
-          ${(currentUser.tags || []).map(t => `<span class="tag">${t}</span>`).join('') || '—'}
-        </div>
-      </div>
-    </div>
+    <button class="profile-save-btn" onclick="saveProfile()">Sauvegarder ✦</button>
+    <div id="profileSaveError" style="font-size:13px;color:var(--accent);text-align:center;margin-top:10px;min-height:18px;"></div>
   `;
+}
+
+async function handlePhotoUpload(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = async function(e) {
+    const base64 = e.target.result;
+    currentUser.profile_photo = base64;
+    const avatar = document.querySelector('.profile-avatar');
+    if (avatar) avatar.innerHTML = `<img src="${base64}" alt="photo" />`;
+    try {
+      await fetch('/api/profile/update', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ profile_photo: base64 })
+      });
+      showToast('Photo mise à jour ✓', 'success');
+    } catch(e) {
+      showToast('Erreur lors de la mise à jour', 'error');
+    }
+  };
+  reader.readAsDataURL(file);
+}
+
+async function saveProfile() {
+  const age   = parseInt(document.getElementById('editAge').value);
+  const bio   = document.getElementById('editBio').value.trim();
+  const tags  = document.getElementById('editTags').value.split(',').map(t => t.trim()).filter(Boolean);
+  const email = document.getElementById('editEmail').value.trim().toLowerCase();
+
+  if (!age || age < 18 || age > 99) {
+    document.getElementById('profileSaveError').textContent = "L'âge doit être entre 18 et 99 ans.";
+    return;
+  }
+  if (!email) {
+    document.getElementById('profileSaveError').textContent = "L'email est requis.";
+    return;
+  }
+
+  try {
+    const res = await fetch('/api/profile/update', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ age, bio, email })
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      document.getElementById('profileSaveError').textContent = data.error || 'Erreur lors de la sauvegarde.';
+      return;
+    }
+
+    currentUser.age   = age;
+    currentUser.desc  = bio;
+    currentUser.bio   = bio;
+    currentUser.tags  = tags;
+    currentUser.email = email;
+
+    const users = dbGetUsers();
+    const idx = users.findIndex(u => u.email === currentUser.email || u.id === currentUser.id);
+    if (idx !== -1) {
+      users[idx] = { ...users[idx], ...currentUser };
+      dbSaveUsers(users);
+    }
+
+    showToast('Profil sauvegardé ✓', 'success');
+    document.getElementById('profileSaveError').textContent = '';
+    renderProfilePanel();
+  } catch(e) {
+    document.getElementById('profileSaveError').textContent = 'Impossible de contacter le serveur.';
+  }
 }
 
 // ─── UNREAD COUNT ─────────────────────────────────────────────────────────────
