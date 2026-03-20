@@ -136,6 +136,20 @@ async function startApp(user) {
   document.getElementById('authScreen').classList.add('hidden');
   document.getElementById('appScreen').classList.remove('hidden');
 
+  // Recharge le profil frais depuis la DB
+  try {
+    const res = await fetch('/api/profile/me');
+    const data = await res.json();
+    if (res.ok && data.user) {
+      currentUser = {
+        ...currentUser,
+        ...data.user,
+        name: data.user.username,
+        desc: data.user.bio || '',
+      };
+    }
+  } catch(e) {}
+
   const todayStr = new Date().toDateString();
   state = dbGetState(user.email) || {
     date: todayStr,
@@ -461,7 +475,6 @@ function toggleProfilePanel() {
 async function renderMatchesList() {
   const list = document.getElementById('matchesList');
   list.innerHTML = '<div class="no-notes">Chargement...</div>';
-
   try {
     const res = await fetch('/api/matches/');
     const data = await res.json();
@@ -473,7 +486,7 @@ async function renderMatchesList() {
       <div class="match-item">
         <div class="match-avatar">${u.profile_photo
           ? `<img src="${u.profile_photo}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />`
-          : (CARD_EMOJIS[u.id % CARD_EMOJIS.length])
+          : CARD_EMOJIS[u.id % CARD_EMOJIS.length]
         }</div>
         <div class="match-info">
           <div class="match-name">${u.username}</div>

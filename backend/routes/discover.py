@@ -9,10 +9,10 @@ def get_profiles():
     if not user_id:
         return jsonify({'error': 'Non connecté'}), 401
 
-    # Récupère les IDs déjà likés
+    user_id = int(user_id)
+
     liked_ids = [l.liked_user_id for l in Like.query.filter_by(user_id=user_id).all()]
 
-    # Retourne tous les autres utilisateurs sauf soi-même et déjà likés
     users = User.query.filter(
         User.id != user_id,
         ~User.id.in_(liked_ids)
