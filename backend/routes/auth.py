@@ -4,12 +4,17 @@ from models import db, User
 
 auth_bp = Blueprint('auth', __name__)
 
+
 @auth_bp.route('/register', methods=['POST'])
 def register():
     data = request.get_json()
 
     if not data or not data.get('email') or not data.get('password') or not data.get('username'):
         return jsonify({'error': 'Email, username et password sont requis'}), 400
+
+    # Validation basique longueur/format
+    if len(data['password']) < 8:
+        return jsonify({'error': 'Le mot de passe doit faire au moins 8 caractères'}), 400
 
     if User.query.filter_by(email=data['email']).first():
         return jsonify({'error': 'Cet email est déjà utilisé'}), 409
@@ -23,12 +28,7 @@ def register():
     user = User(
         username=data['username'],
         email=data['email'],
-        first_name=data.get('first_name'),
-        last_name=data.get('last_name'),
         age=data.get('age'),
-        gender=data.get('gender'),
-        looking_for=data.get('looking_for'),
-        location=data.get('location'),
         bio=data.get('bio', ''),
         tags=tags_str,
     )
@@ -37,7 +37,10 @@ def register():
     db.session.add(user)
     db.session.commit()
 
-    return jsonify({'message': 'Compte créé avec succès', 'user': user.to_dict()}), 201
+    login_user(user, remember=True)
+
+    # FIX : on retourne to_private_dict() car c'est le propriétaire du compte
+    return jsonify({'message': 'Compte créé avec succès', 'user': user.to_private_dict()}), 201
 
 
 @auth_bp.route('/login', methods=['POST'])
@@ -49,11 +52,14 @@ def login():
 
     user = User.query.filter_by(email=data['email']).first()
 
+    # FIX : message générique pour ne pas révéler si l'email existe
     if not user or not user.check_password(data['password']):
         return jsonify({'error': 'Email ou mot de passe incorrect'}), 401
 
     login_user(user, remember=True)
-    return jsonify({'message': 'Connexion réussie', 'user': user.to_dict()}), 200
+
+    # FIX : to_private_dict() car c'est le propriétaire du compte
+    return jsonify({'message': 'Connexion réussie', 'user': user.to_private_dict()}), 200
 
 
 @auth_bp.route('/logout', methods=['POST'])
@@ -66,4 +72,4 @@ def logout():
 @auth_bp.route('/me', methods=['GET'])
 @login_required
 def me():
-    return jsonify({'user': current_user.to_dict()}), 200
+    return jsonify({'user': current_user.to_private_dict()}), 200

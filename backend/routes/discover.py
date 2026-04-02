@@ -3,6 +3,7 @@ from models import db, User, Like
 
 discover_bp = Blueprint('discover', __name__)
 
+
 @discover_bp.route('/', methods=['GET'])
 def get_profiles():
     user_id = session.get('_user_id')
@@ -18,4 +19,6 @@ def get_profiles():
         ~User.id.in_(liked_ids)
     ).all()
 
+    # FIX : to_dict() retourne uniquement les champs publics (sans email, sans hash).
+    # La sanitisation XSS de la bio est faite dans to_dict() via bleach.
     return jsonify({'users': [u.to_dict() for u in users]}), 200

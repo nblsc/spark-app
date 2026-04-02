@@ -3,12 +3,12 @@ from dotenv import load_dotenv
 from flask import Flask, jsonify, render_template
 from flask_login import LoginManager
 from flask_cors import CORS
-from config import DevelopmentConfig
 from models import db, User
 
 load_dotenv()
 
-def create_app(config_name='development'):
+
+def create_app():
     app = Flask(__name__,
                 template_folder='../frontend/templates',
                 static_folder='../frontend/static',
@@ -19,9 +19,12 @@ def create_app(config_name='development'):
         from config import ProductionConfig
         app.config.from_object(ProductionConfig)
     else:
+        from config import DevelopmentConfig
         app.config.from_object(DevelopmentConfig)
 
-    CORS(app, resources={r"/api/*": {"origins": "*"}})
+    # FIX : CORS restreint à l'origine de l'appli, pas "*"
+    allowed_origins = os.getenv('ALLOWED_ORIGINS', 'http://localhost:5000').split(',')
+    CORS(app, resources={r"/api/*": {"origins": allowed_origins}}, supports_credentials=True)
 
     db.init_app(app)
 
@@ -38,7 +41,7 @@ def create_app(config_name='development'):
 
     @app.route('/api/health', methods=['GET'])
     def health():
-        return jsonify({'status': 'OK', 'message': 'Backend is running!'}), 200
+        return jsonify({'status': 'OK'}), 200
 
     @app.route('/', methods=['GET'])
     @app.route('/index', methods=['GET'])
@@ -59,6 +62,8 @@ def create_app(config_name='development'):
 
     return app
 
+
 if __name__ == '__main__':
     app = create_app()
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    # FIX : debug=False — ne jamais lancer avec debug=True sur un port public
+    app.run(debug=False, host='127.0.0.1', port=5000)

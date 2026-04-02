@@ -1,44 +1,50 @@
-// ─── STORAGE HELPERS ─────────────────────────────────────────────────────────
-const DB_USERS_KEY   = 'spark_users';
-const DB_SESSION_KEY = 'spark_session';
-const DB_STATE_KEY   = 'spark_state_';
-
+// ─── CONSTANTES ──────────────────────────────────────────────────────────────
 const CARD_COLORS = [
   "#2a1a2e","#1a2a1e","#2a1e18","#18202a","#162228","#221820",
   "#2a2218","#1e1a2a","#182a22","#28181e","#1a2228","#201e18"
 ];
 const CARD_EMOJIS = ["🎞️","🏔️","🎨","🏙️","🐠","✍️","🎸","🌿","🎭","🚀","🌊","🦋"];
 
-function dbGetUsers() {
-  try { return JSON.parse(localStorage.getItem(DB_USERS_KEY)) || []; }
-  catch(e) { return []; }
+// FIX : Suppression totale du localStorage pour la gestion de session.
+// La session est désormais gérée côté serveur via cookie HttpOnly (Flask-Login).
+// Le localStorage ne stocke plus que les préférences UI non sensibles (compteur de notes).
+
+// ─── UTILS SÉCURITÉ ───────────────────────────────────────────────────────────
+
+/**
+ * FIX ANTI-XSS : échappe tous les caractères HTML dangereux avant injection dans le DOM.
+ * À utiliser systématiquement pour toute donnée venant du serveur.
+ */
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
-function dbSaveUsers(users) {
-  localStorage.setItem(DB_USERS_KEY, JSON.stringify(users));
-}
-function dbGetSession() {
-  return localStorage.getItem(DB_SESSION_KEY) || null;
-}
-function dbSetSession(email) {
-  if (email) localStorage.setItem(DB_SESSION_KEY, email);
-  else localStorage.removeItem(DB_SESSION_KEY);
-}
-function dbGetState(email) {
+
+// ─── STATE LOCAL (non sensible) ───────────────────────────────────────────────
+// FIX : seul le compteur de notes (non sensible) reste en localStorage.
+// L'identité de l'utilisateur n'est JAMAIS stockée côté client.
+function getLocalState(userId) {
   try {
-    const saved = JSON.parse(localStorage.getItem(DB_STATE_KEY + email));
+    const saved = JSON.parse(localStorage.getItem('spark_state_' + userId));
     if (!saved) return null;
     const today = new Date().toDateString();
     if (saved.date !== today) {
       saved.notesLeft = 4;
       saved.date = today;
       saved.deckIndex = 0;
-      dbSaveState(email, saved);
+      saveLocalState(userId, saved);
     }
     return saved;
   } catch(e) { return null; }
 }
-function dbSaveState(email, s) {
-  localStorage.setItem(DB_STATE_KEY + email, JSON.stringify(s));
+
+function saveLocalState(userId, s) {
+  localStorage.setItem('spark_state_' + userId, JSON.stringify(s));
 }
 
 // ─── AUTH ─────────────────────────────────────────────────────────────────────
@@ -65,11 +71,13 @@ async function doLogin() {
     const res = await fetch('/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      // FIX : credentials:'include' pour que le cookie de session soit envoyé/reçu
+      credentials: 'include',
       body: JSON.stringify({ email, password })
     });
     const data = await res.json();
     if (!res.ok) return showError('loginError', data.error || 'Erreur de connexion.');
-    dbSetSession(email);
+    // FIX : on ne stocke PLUS l'email dans localStorage — la session vit dans le cookie
     startApp(data.user);
   } catch(e) {
     showError('loginError', 'Impossible de contacter le serveur.');
@@ -88,8 +96,8 @@ async function doRegister() {
     return showError('registerError', 'Remplis tous les champs.');
   if (age < 18 || age > 99)
     return showError('registerError', "L'âge doit être entre 18 et 99 ans.");
-  if (password.length < 6)
-    return showError('registerError', 'Le mot de passe doit faire au moins 6 caractères.');
+  if (password.length < 8)
+    return showError('registerError', 'Le mot de passe doit faire au moins 8 caractères.');
 
   const tags = tagsRaw
     ? tagsRaw.split(',').map(t => t.trim()).filter(Boolean).slice(0, 5)
@@ -99,29 +107,23 @@ async function doRegister() {
     const res = await fetch('/api/auth/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
       body: JSON.stringify({ username: name, email, password, age, bio: desc, tags })
     });
     const data = await res.json();
     if (!res.ok) return showError('registerError', data.error || "Erreur lors de l'inscription.");
 
-    const user = {
-      ...data.user,
-      name: data.user.username,
-      desc: data.user.bio,
-      tags: data.user.tags || tags,
-      color: CARD_COLORS[Math.floor(Math.random() * CARD_COLORS.length)],
-      emoji: CARD_EMOJIS[Math.floor(Math.random() * CARD_EMOJIS.length)],
-    };
-    dbSetSession(email);
-    startApp(user);
-    showToast(`Bienvenue ${name} ! 🎉`, 'success');
+    startApp(data.user);
+    showToast(`Bienvenue ${escapeHtml(name)} ! 🎉`, 'success');
   } catch(e) {
     showError('registerError', 'Impossible de contacter le serveur.');
   }
 }
 
-function doLogout() {
-  dbSetSession(null);
+async function doLogout() {
+  try {
+    await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
+  } catch(e) {}
   currentUser = null;
   deck = [];
   document.getElementById('appScreen').classList.add('hidden');
@@ -136,8 +138,9 @@ async function startApp(user) {
   document.getElementById('authScreen').classList.add('hidden');
   document.getElementById('appScreen').classList.remove('hidden');
 
+  // Recharge le profil depuis le serveur (source de vérité)
   try {
-    const res = await fetch('/api/profile/me');
+    const res = await fetch('/api/profile/me', { credentials: 'include' });
     const data = await res.json();
     if (res.ok && data.user) {
       currentUser = {
@@ -151,19 +154,13 @@ async function startApp(user) {
   } catch(e) {}
 
   const todayStr = new Date().toDateString();
-  state = dbGetState(user.email) || {
+  // FIX : on utilise l'ID (non sensible) comme clé de state local
+  state = getLocalState(currentUser.id) || {
     date: todayStr,
     notesLeft: 4,
     deckIndex: 0,
     sentNotes: [],
   };
-
-  if (state.date !== todayStr) {
-    state.notesLeft = 4;
-    state.date = todayStr;
-    state.deckIndex = 0;
-    dbSaveState(user.email, state);
-  }
 
   await buildDeck();
   renderDeck();
@@ -177,7 +174,7 @@ let state = {};
 
 async function buildDeck() {
   try {
-    const res = await fetch('/api/discover/');
+    const res = await fetch('/api/discover/', { credentials: 'include' });
     const data = await res.json();
     if (!res.ok) { deck = []; return; }
 
@@ -202,8 +199,14 @@ function buildCard(profile) {
   card.dataset.id = profile.id;
 
   const cardBg = profile.profile_photo
-    ? `<img src="${profile.profile_photo}" style="width:100%;height:100%;object-fit:cover;" />`
-    : `<div style="width:100%;height:100%;background:linear-gradient(160deg,${profile.color} 0%,#0c0c0f 100%);display:flex;align-items:center;justify-content:center;font-size:120px;filter:saturate(0.8);">${profile.emoji}</div>`;
+    ? `<img src="${escapeHtml(profile.profile_photo)}" style="width:100%;height:100%;object-fit:cover;" />`
+    : `<div style="width:100%;height:100%;background:linear-gradient(160deg,${escapeHtml(profile.color)} 0%,#0c0c0f 100%);display:flex;align-items:center;justify-content:center;font-size:120px;filter:saturate(0.8);">${escapeHtml(profile.emoji)}</div>`;
+
+  // FIX : toutes les données dynamiques sont passées dans escapeHtml() avant
+  // injection dans innerHTML, ce qui neutralise les payloads XSS résiduels.
+  const tagsHtml = (profile.tags || [])
+    .map(t => `<span class="tag">${escapeHtml(t)}</span>`)
+    .join('');
 
   card.innerHTML = `
     ${cardBg}
@@ -212,12 +215,11 @@ function buildCard(profile) {
     <div class="indicator nope">NOPE</div>
     <div class="card-info">
       <div>
-        <span class="card-name">${profile.name}</span><span class="card-age">${profile.age} ans</span>
+        <span class="card-name">${escapeHtml(profile.name)}</span>
+        <span class="card-age">${escapeHtml(String(profile.age))} ans</span>
       </div>
-      <div class="card-desc">${profile.desc}</div>
-      <div class="card-tags">
-        ${(profile.tags || []).map(t => `<span class="tag">${t}</span>`).join('')}
-      </div>
+      <div class="card-desc">${escapeHtml(profile.desc)}</div>
+      <div class="card-tags">${tagsHtml}</div>
     </div>
   `;
   return card;
@@ -339,13 +341,14 @@ function flyOut(direction) {
   activeCard = null;
 
   if (direction === 'right') {
-    showToast(`Tu as liké ${topCardProfile.name} ❤️`, 'success');
+    showToast(`Tu as liké ${escapeHtml(topCardProfile.name)} ❤️`, 'success');
     fetch('/api/matches/like', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
       body: JSON.stringify({ liked_user_id: topCardProfile.id })
     }).then(res => res.json()).then(data => {
-      if (data.matched) showToast(`🎉 Match avec ${topCardProfile.name} !`, 'success');
+      if (data.matched) showToast(`🎉 Match avec ${escapeHtml(topCardProfile.name)} !`, 'success');
     }).catch(() => {});
   } else {
     showToast('Profil suivant →', 'info');
@@ -353,7 +356,7 @@ function flyOut(direction) {
 
   setTimeout(() => {
     deck.shift();
-    dbSaveState(currentUser.email, state);
+    saveLocalState(currentUser.id, state);
     renderDeck();
   }, 400);
 }
@@ -394,6 +397,7 @@ async function sendNote() {
     await fetch('/api/messages/send', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
       body: JSON.stringify({ receiver_id: topCardProfile.id, content: text })
     });
   } catch(e) {
@@ -409,9 +413,9 @@ async function sendNote() {
 
   state.notesLeft--;
   state.sentNotes.unshift(note);
-  dbSaveState(currentUser.email, state);
+  saveLocalState(currentUser.id, state);
   closeModal();
-  showToast(`Note envoyée à ${note.to} 💌`, 'success');
+  showToast(`Note envoyée à ${escapeHtml(note.to)} 💌`, 'success');
   setTimeout(() => swipeCard('right'), 300);
   updateNotesUI();
 }
@@ -429,11 +433,12 @@ function renderNotesList() {
     list.innerHTML = '<div class="no-notes">Aucune note envoyée aujourd\'hui.</div>';
     return;
   }
+  // FIX : escapeHtml sur le contenu des notes avant injection innerHTML
   list.innerHTML = state.sentNotes.map(n => `
     <div class="note-item">
-      <div class="note-item-name">À ${n.to} ❤️</div>
-      <div class="note-item-text">${n.text}</div>
-      <div class="note-item-time">${n.time}</div>
+      <div class="note-item-name">À ${escapeHtml(n.to)} ❤️</div>
+      <div class="note-item-text">${escapeHtml(n.text)}</div>
+      <div class="note-item-time">${escapeHtml(n.time)}</div>
     </div>
   `).join('');
 }
@@ -476,21 +481,22 @@ async function renderMatchesList() {
   const list = document.getElementById('matchesList');
   list.innerHTML = '<div class="no-notes">Chargement...</div>';
   try {
-    const res = await fetch('/api/matches/');
+    const res = await fetch('/api/matches/', { credentials: 'include' });
     const data = await res.json();
     if (!res.ok || data.matches.length === 0) {
       list.innerHTML = '<div class="no-notes">Aucun match pour l\'instant 💫</div>';
       return;
     }
+    // FIX : escapeHtml sur toutes les données affichées
     list.innerHTML = data.matches.map(u => `
       <div class="match-item">
         <div class="match-avatar">${u.profile_photo
-          ? `<img src="${u.profile_photo}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />`
+          ? `<img src="${escapeHtml(u.profile_photo)}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />`
           : CARD_EMOJIS[u.id % CARD_EMOJIS.length]
         }</div>
         <div class="match-info">
-          <div class="match-name">${u.username}</div>
-          <div class="match-sub">${u.age} ans</div>
+          <div class="match-name">${escapeHtml(u.username)}</div>
+          <div class="match-sub">${escapeHtml(String(u.age))} ans</div>
         </div>
       </div>
     `).join('');
@@ -504,9 +510,10 @@ function renderProfilePanel() {
   if (!currentUser) return;
 
   const photo = currentUser.profile_photo
-    ? `<img src="${currentUser.profile_photo}" alt="photo" />`
+    ? `<img src="${escapeHtml(currentUser.profile_photo)}" alt="photo" />`
     : (currentUser.emoji || '👤');
 
+  // FIX : toutes les valeurs utilisateur sont échappées
   content.innerHTML = `
     <div class="profile-avatar-wrapper">
       <div class="profile-avatar" onclick="document.getElementById('photoInput').click()">
@@ -515,23 +522,23 @@ function renderProfilePanel() {
       <div class="profile-photo-label">✏️</div>
       <input type="file" id="photoInput" class="profile-photo-upload" accept="image/*" onchange="handlePhotoUpload(event)" />
     </div>
-    <div class="profile-name">${currentUser.name || currentUser.username}</div>
-    <div class="profile-age">${currentUser.age} ans</div>
+    <div class="profile-name">${escapeHtml(currentUser.name || currentUser.username)}</div>
+    <div class="profile-age">${escapeHtml(String(currentUser.age))} ans</div>
     <div class="profile-section">
       <div class="profile-section-label">Âge</div>
-      <input class="profile-edit-input" type="number" id="editAge" value="${currentUser.age || ''}" min="18" max="99" placeholder="Ton âge" />
+      <input class="profile-edit-input" type="number" id="editAge" value="${escapeHtml(String(currentUser.age || ''))}" min="18" max="99" placeholder="Ton âge" />
     </div>
     <div class="profile-section">
       <div class="profile-section-label">À propos</div>
-      <textarea class="profile-edit-input" id="editBio" rows="3" placeholder="Ta description...">${currentUser.desc || currentUser.bio || ''}</textarea>
+      <textarea class="profile-edit-input" id="editBio" rows="3" placeholder="Ta description...">${escapeHtml(currentUser.desc || currentUser.bio || '')}</textarea>
     </div>
     <div class="profile-section">
       <div class="profile-section-label">Centres d'intérêt <span style="color:var(--muted);font-size:11px">(séparés par des virgules)</span></div>
-      <input class="profile-edit-input" type="text" id="editTags" value="${(currentUser.tags || []).join(', ')}" placeholder="Musique, Voyage, Tech" />
+      <input class="profile-edit-input" type="text" id="editTags" value="${escapeHtml((currentUser.tags || []).join(', '))}" placeholder="Musique, Voyage, Tech" />
     </div>
     <div class="profile-section">
       <div class="profile-section-label">Email</div>
-      <input class="profile-edit-input" type="email" id="editEmail" value="${currentUser.email || ''}" placeholder="toi@email.com" />
+      <input class="profile-edit-input" type="email" id="editEmail" value="${escapeHtml(currentUser.email || '')}" placeholder="toi@email.com" />
     </div>
     <button class="profile-save-btn" onclick="saveProfile()">Sauvegarder ✦</button>
     <div id="profileSaveError" style="font-size:13px;color:var(--accent);text-align:center;margin-top:10px;min-height:18px;"></div>
@@ -541,16 +548,22 @@ function renderProfilePanel() {
 async function handlePhotoUpload(event) {
   const file = event.target.files[0];
   if (!file) return;
+  // FIX : validation du type MIME côté client (doublée côté serveur)
+  if (!file.type.startsWith('image/')) {
+    showToast('Fichier non autorisé', 'error');
+    return;
+  }
   const reader = new FileReader();
   reader.onload = async function(e) {
     const base64 = e.target.result;
     currentUser.profile_photo = base64;
     const avatar = document.querySelector('.profile-avatar');
-    if (avatar) avatar.innerHTML = `<img src="${base64}" alt="photo" />`;
+    if (avatar) avatar.innerHTML = `<img src="${escapeHtml(base64)}" alt="photo" />`;
     try {
       await fetch('/api/profile/update', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ profile_photo: base64 })
       });
       showToast('Photo mise à jour ✓', 'success');
@@ -580,6 +593,7 @@ async function saveProfile() {
     const res = await fetch('/api/profile/update', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
       body: JSON.stringify({ age, bio, email, tags })
     });
     const data = await res.json();
@@ -594,13 +608,6 @@ async function saveProfile() {
     currentUser.tags  = tags;
     currentUser.email = email;
 
-    const users = dbGetUsers();
-    const idx = users.findIndex(u => u.email === currentUser.email || u.id === currentUser.id);
-    if (idx !== -1) {
-      users[idx] = { ...users[idx], ...currentUser };
-      dbSaveUsers(users);
-    }
-
     showToast('Profil sauvegardé ✓', 'success');
     document.getElementById('profileSaveError').textContent = '';
     await buildDeck();
@@ -613,7 +620,7 @@ async function saveProfile() {
 // ─── UNREAD COUNT ─────────────────────────────────────────────────────────────
 async function fetchUnreadCount() {
   try {
-    const res = await fetch('/api/messages/unread');
+    const res = await fetch('/api/messages/unread', { credentials: 'include' });
     const data = await res.json();
     const count = data.count || 0;
     const matchesBtn = document.getElementById('navMatchesBtn');
@@ -635,7 +642,7 @@ function showToast(msg, type = 'info') {
   const container = document.getElementById('toastContainer');
   const toast = document.createElement('div');
   toast.className = `toast ${type}`;
-  toast.textContent = msg;
+  toast.textContent = msg; // textContent = pas d'injection HTML possible
   container.appendChild(toast);
   setTimeout(() => toast.remove(), 2600);
 }
@@ -656,9 +663,18 @@ document.addEventListener('keydown', function(e) {
 });
 
 // ─── INIT ────────────────────────────────────────────────────────────────────
-const savedSession = dbGetSession();
-if (savedSession) {
-  const users = dbGetUsers();
-  const user = users.find(u => u.email === savedSession);
-  if (user) startApp(user);
-}
+// FIX : au lieu de lire le localStorage, on interroge le serveur.
+// Si le cookie de session est valide, le serveur renvoie le profil, sinon 401.
+(async () => {
+  try {
+    const res = await fetch('/api/profile/me', { credentials: 'include' });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.user) {
+        startApp(data.user);
+        return;
+      }
+    }
+  } catch(e) {}
+  // Pas de session valide → on reste sur l'écran de connexion
+})();
