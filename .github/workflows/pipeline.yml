@@ -9,9 +9,8 @@ on:
 
 jobs:
 
-  
   secret-scan:
-    name:  Scan Secrets (Gitleaks)
+    name: Scan Secrets (Gitleaks)
     runs-on: ubuntu-latest
 
     steps:
@@ -26,9 +25,9 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
 
- 
+
   lint:
-    name:  Lint Python (Flake8)
+    name: Lint Python (Flake8)
     runs-on: ubuntu-latest
 
     steps:
@@ -46,9 +45,9 @@ jobs:
       - name: Lancer Flake8
         run: flake8 backend/ --max-line-length=120 --exclude=__pycache__,.env,migrations --ignore=W292,W293 --statistics --count
 
-  
+
   bandit:
-    name:  Sécurité Code (Bandit)
+    name: Sécurité Code (Bandit)
     runs-on: ubuntu-latest
 
     steps:
@@ -66,9 +65,9 @@ jobs:
       - name: Lancer Bandit
         run: bandit -r backend/ -ll -x backend/__pycache__
 
-  
+
   pip-audit:
-    name:  Sécurité Dépendances (pip-audit)
+    name: Sécurité Dépendances (pip-audit)
     runs-on: ubuntu-latest
 
     steps:
@@ -109,30 +108,27 @@ jobs:
       - name: Vérifier que l'app démarre
         run: |
           cd backend
-          python -c "import app; print('✅ App importée avec succès')"
+          python -c "import app; print(' App importée avec succès')"
 
-    
-  docker-security:
-    name: Docker Build & Scan
+
+  docker:
+    name: Docker — Build & Scan (Trivy)
     runs-on: ubuntu-latest
-    needs: [secret-scan, lint, bandit, pip-audit]
-    
+    needs: [build]
+
     steps:
       - name: Checkout du code
         uses: actions/checkout@v4
 
       - name: Build de l'image Docker
-        run: docker build -t my-python-app:${{ github.sha }} -f backend/Dockerfile .
+        run: docker build -t mon-app:${{ github.sha }} .
 
-      - name: Scan de l'image avec Trivy
+      - name: Scanner l'image avec Trivy
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: 'my-python-app:${{ github.sha }}'
-          format: 'table'
-          exit-code: '1'
+          image-ref: mon-app:${{ github.sha }}
+          format: table
+          exit-code: "1"
           ignore-unfixed: true
-          vuln-type: 'os,library'
-          severity: 'CRITICAL,HIGH'
-
-
-
+          vuln-type: os,library
+          severity: CRITICAL,HIGH,MEDIUM
