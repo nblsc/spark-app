@@ -73,3 +73,4 @@ def get_profile():
         return jsonify({'error': 'Utilisateur introuvable'}), 404
 
     return jsonify({'user': user.to_private_dict()}), 200
+    

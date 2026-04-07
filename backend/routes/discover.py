@@ -1,5 +1,5 @@
 from flask import Blueprint, jsonify, session
-from models import db, User, Like
+from models import User, Like
 
 discover_bp = Blueprint('discover', __name__)
 
@@ -12,7 +12,7 @@ def get_profiles():
 
     user_id = int(user_id)
 
-    liked_ids = [l.liked_user_id for l in Like.query.filter_by(user_id=user_id).all()]
+    liked_ids = [like.liked_user_id for like in Like.query.filter_by(user_id=user_id).all()]
 
     users = User.query.filter(
         User.id != user_id,
@@ -22,3 +22,4 @@ def get_profiles():
     # FIX : to_dict() retourne uniquement les champs publics (sans email, sans hash).
     # La sanitisation XSS de la bio est faite dans to_dict() via bleach.
     return jsonify({'users': [u.to_dict() for u in users]}), 200
+    

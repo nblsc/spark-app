@@ -73,3 +73,4 @@ def logout():
 @login_required
 def me():
     return jsonify({'user': current_user.to_private_dict()}), 200
+    

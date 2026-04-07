@@ -1,7 +1,8 @@
 from flask import Blueprint, jsonify, request, session
-from models import db, Message, User
+from models import db, Message
 
 messages_bp = Blueprint('messages', __name__)
+
 
 @messages_bp.route('/send', methods=['POST'])
 def send_message():
@@ -48,3 +49,4 @@ def get_unread_count():
 
     count = Message.query.filter_by(receiver_id=user_id, is_read=False).count()
     return jsonify({'count': count}), 200
+    
