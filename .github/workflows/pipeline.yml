@@ -1,77 +1,62 @@
-name: CI
- 
+name: "Lab1 · Qualité & Secrets"
+
 on:
   push:
-    branches: ["main"]
+    branches: [main, develop]
   pull_request:
-    branches: ["main"]
-  workflow_dispatch:
- 
+
 jobs:
- 
-  # ─── Job 1 : Scan des secrets ───────────────────────────────────────────────
-  secret-scan:
-    name: Scan Secrets (Gitleaks)
+# ─────────────────────────────────────────────────────────────
+# OBLIGATOIRE 1/2 — Ruff
+# ─────────────────────────────────────────────────────────────
+  lint:
+    name: "Linter — Ruff"
     runs-on: ubuntu-latest
- 
     steps:
-      - name: Checkout du code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
-          fetch-depth: 0  # nécessaire pour que Gitleaks scanne tout l'historique
- 
-      - name: Scan avec Gitleaks
+          python-version: "3.11"
+      
+      - name: Installation et Run Ruff
+        run: |
+          pip install ruff
+          ruff check src/
+          ruff format --check src/
+
+      - name: Aide si échec
+        if: failure()
+        run: echo "::error::Échec du Linting. Lancez 'ruff check --fix' localement."
+
+# ─────────────────────────────────────────────────────────────
+# OBLIGATOIRE 2/2 — Scan Secrets (Gitleaks)
+# ─────────────────────────────────────────────────────────────
+  gitleaks:
+    name: "Sécurité — Gitleaks"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Important : scanne tout l'historique
+
+      - name: Gitleaks Scan
         uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
- 
-  # ─── Job 2 : Lint du code Python ────────────────────────────────────────────
-  lint:
-    name: Lint Python (Flake8)
+          # BONUS : Utilisation de la règle custom via le fichier config
+          GITLEAKS_CONFIG: .gitleaks.toml 
+
+# ─────────────────────────────────────────────────────────────
+# BONUS — Alternative à Gitleaks (detect-secrets)
+# ─────────────────────────────────────────────────────────────
+  detect-secrets:
+    name: "Bonus — detect-secrets"
     runs-on: ubuntu-latest
- 
     steps:
-      - name: Checkout du code
-        uses: actions/checkout@v4
- 
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
- 
-      - name: Installer Flake8
-        run: pip install flake8
- 
-      - name: Lancer Flake8
+      - uses: actions/checkout@v4
+      - name: Install & Scan
         run: |
-          flake8 backend/ \
-            --max-line-length=120 \
-            --exclude=__pycache__,.env,migrations \
-            --statistics \
-            --count
- 
-  # ─── Job 3 : Build (conditionné aux deux jobs précédents) ───────────────────
-  build:
-    name: Build
-    runs-on: ubuntu-latest
-    needs: [secret-scan, lint]  # ne tourne que si les 2 jobs passent
- 
-    steps:
-      - name: Checkout du code
-        uses: actions/checkout@v4
- 
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
- 
-      - name: Installer les dépendances
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r backend/requirements.txt
- 
-      - name: Vérifier que l'app démarre
-        run: |
-          cd backend
-          python -c "import app; print(' App importée avec succès')"
+          pip install detect-secrets
+          detect-secrets scan src/ > .secrets.baseline
+          # Le script échoue si un secret est trouvé (via le baseline)
+          if grep -q "results" .secrets.baseline; then exit 1; fi
