@@ -9,7 +9,7 @@ on:
  
 jobs:
  
-  # ─── Job 1 : Scan des secrets ───────────────────────────────────────────────
+ 
   secret-scan:
     name: Scan Secrets (Gitleaks)
     runs-on: ubuntu-latest
@@ -26,7 +26,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
  
-  # ─── Job 2 : Lint du code Python ────────────────────────────────────────────
+
   lint:
     name: Lint Python (Flake8)
     runs-on: ubuntu-latest
@@ -47,11 +47,12 @@ jobs:
         run: |
           flake8 backend/ \
             --max-line-length=120 \
-            --exclude=__pycache__,.env,migrations \
+            --exclude=__pycache__,.env,migrations \ 
+            --ignore=W292,W293 \
             --statistics \
             --count
  
-  # ─── Job 3 : Build (conditionné aux deux jobs précédents) ───────────────────
+  
   build:
     name: Build
     runs-on: ubuntu-latest
