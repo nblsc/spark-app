@@ -1,41 +1,77 @@
-# This is a basic workflow to help you get started with Actions
-
 name: CI
-
-# Controls when the workflow will run
+ 
 on:
-  # Triggers the workflow on push or pull request events but only for the "main" branch
   push:
-    branches: [ "main" ]
+    branches: ["main"]
   pull_request:
-    branches: [ "main" ]
-
-  # Allows you to run this workflow manually from the Actions tab
+    branches: ["main"]
   workflow_dispatch:
-
-# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+ 
 jobs:
-  # This workflow contains a single job called "build"
-  build:
-    # The type of runner thatttttt the job will run on
+ 
+  # ─── Job 1 : Scan des secrets ───────────────────────────────────────────────
+  secret-scan:
+    name: Scan Secrets (Gitleaks)
     runs-on: ubuntu-latest
-
-    # Steps represent a sequence of tasks that will be executed as part of the job
+ 
     steps:
-      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-      - uses: actions/checkout@v4
-
-      - uses: gitleaks/gitleaks-action@v2
+      - name: Checkout du code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # nécessaire pour que Gitleaks scanne tout l'historique
+ 
+      - name: Scan avec Gitleaks
+        uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
-
-      # Runs a single command using the runners shell
-      - name: Run a one-line script
-        run: echo Hello, world!
-
-      # Runs a set of commands using the runners shell
-      - name: Run a multi-line script
+ 
+  # ─── Job 2 : Lint du code Python ────────────────────────────────────────────
+  lint:
+    name: Lint Python (Flake8)
+    runs-on: ubuntu-latest
+ 
+    steps:
+      - name: Checkout du code
+        uses: actions/checkout@v4
+ 
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+ 
+      - name: Installer Flake8
+        run: pip install flake8
+ 
+      - name: Lancer Flake8
         run: |
-          echo Add other actions to build,
-          echo test, and deploy your project.
+          flake8 backend/ \
+            --max-line-length=120 \
+            --exclude=__pycache__,.env,migrations \
+            --statistics \
+            --count
+ 
+  # ─── Job 3 : Build (conditionné aux deux jobs précédents) ───────────────────
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    needs: [secret-scan, lint]  # ne tourne que si les 2 jobs passent
+ 
+    steps:
+      - name: Checkout du code
+        uses: actions/checkout@v4
+ 
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+ 
+      - name: Installer les dépendances
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+ 
+      - name: Vérifier que l'app démarre
+        run: |
+          cd backend
+          python -c "import app; print(' App importée avec succès')"
