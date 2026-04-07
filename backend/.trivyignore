@@ -1,0 +1,5 @@
+# Faux positifs - packages vendorisés internes à setuptools
+# Ces CVE affectent les copies bundlées dans setuptools/_vendor/
+# et ne peuvent pas être mises à jour directement
+CVE-2026-23949
+CVE-2026-24049

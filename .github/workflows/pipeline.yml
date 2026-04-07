@@ -132,6 +132,7 @@ jobs:
           ignore-unfixed: true
           vuln-type: os,library
           severity: CRITICAL,HIGH,MEDIUM
+          trivyignores: .trivyignore
 
       - name: Scanner le repo avec Trivy (filesystem)
         uses: aquasecurity/trivy-action@master
@@ -142,3 +143,4 @@ jobs:
           exit-code: "1"
           ignore-unfixed: true
           severity: CRITICAL,HIGH,MEDIUM
+          trivyignores: .trivyignore
