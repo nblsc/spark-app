@@ -112,12 +112,12 @@ jobs:
           python -c "import app; print('✅ App importée avec succès')"
 
     
-    build docker-security:
+  docker-security:
         name: Docker Build & Scan
         runs-on: ubuntu-latest
         needs: [secret-scan, lint, bandit, pip-audit] # On attend que les tests de base passent
     
-      steps:
+       steps:
       - name: Checkout du code
         uses: actions/checkout@v4
 
