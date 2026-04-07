@@ -109,6 +109,7 @@ jobs:
       - name: Vérifier que l'app démarre
         run: |
           cd backend
+<<<<<<< HEAD
           python -c "import app; print('✅ App importée avec succès')"
 
     
@@ -134,3 +135,6 @@ jobs:
           ignore-unfixed: true
           vuln-type: 'os,library'
           severity: 'CRITICAL,HIGH'
+=======
+          python -c "import app; print(' App importée avec succès')"
+>>>>>>> e542edff0349a411e08e4b45ffa6612e654e9531
