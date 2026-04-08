@@ -38,7 +38,7 @@ class DevelopmentConfig(Config):
 
 class ProductionConfig(Config):
     """Config production."""
-    DEBUG = Fralse       # FIX : Werkzeug debugger désactivé — était la faille RCE
+    DEBUG = False       # FIX : Werkzeug debugger désactivé — était la faille RCE
     TESTING = False
     SESSION_COOKIE_SECURE = True   # HTTPS obligatoire
     SESSION_COOKIE_HTTPONLY = True
