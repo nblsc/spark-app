@@ -160,49 +160,25 @@ jobs:
 
       - name: Démarrer l'application
         run: |
-          docker run -d \
-            --name mon-app-dast \
-            -p 8000:8000 \
-            mon-app:${{ github.sha }}
-          # Attendre que l'app soit prête
-          echo "Attente du démarrage de l'application..."
-          for i in $(seq 1 15); do
-            if curl -sf http://localhost:8000/ > /dev/null 2>&1; then
-              echo "✅ Application prête"
-              break
-            fi
-            echo "Tentative $i/15..."
-            sleep 2
-          done
+          docker run -d --name mon-app-dast -p 8000:8000 mon-app:test
+          timeout 30s sh -c 'until curl -s http://localhost:8000/ > /dev/null; do sleep 2; done'
 
-      - name: Installer Nikto
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y nikto
+      - name: Scan Nikto
+        uses: sec-it/nikto-action@v2.3.0
+        with:
+          target: http://localhost:8000
+          options: -Tuning 123b -o nikto-report.txt -Format txt
 
-      - name: Lancer Nikto (DAST)
-        run: |
-          nikto -h http://localhost:8000 \
-            -output nikto-report.txt \
-            -Format txt \
-            -Tuning 1234567890ab \
-            -nointeractive || true
-
-      - name: Afficher le rapport Nikto
-        if: always()
-        run: cat nikto-report.txt
-
-      - name: Upload rapport Nikto
+      - name: Archiver le rapport DAST
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: nikto-report
           path: nikto-report.txt
-          retention-days: 30
 
-      - name: Arrêter le conteneur
+      - name: Cleanup
         if: always()
-        run: docker stop mon-app-dast && docker rm mon-app-dast
+        run: docker stop app-dast && docker rm app-dast
 
 
   push-dockerhub:
