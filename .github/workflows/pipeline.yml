@@ -63,7 +63,7 @@ jobs:
         run: pip install flake8
 
       - name: Lancer Flake8
-        run: flake8 backend/ --max-line-length=120 --exclude=__pycache__,.env,migrations --ignore=W292,W293 --statistics --count
+        run: flake8 backend/ --max-line-length=120 --exclude=__pycache__,.env,migrations --ignore=W292,W293,W504 --statistics --count
 
   bandit:
     name: Sécurité Code (Bandit)
