@@ -1,0 +1,26 @@
+title = "Gitleaks Custom Config"
+
+[[rules]]
+id          = "spark-internal-token"
+description = "Spark internal API token"
+regex       = '''SPARK_[A-Z0-9]{20,}'''
+tags        = ["token", "spark", "custom"]
+severity    = "HIGH"
+
+[[rules]]
+id          = "hardcoded-jwt"
+description = "Hardcoded JWT token"
+regex       = '''eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}'''
+tags        = ["jwt", "token"]
+severity    = "CRITICAL"
+
+[[rules]]
+id          = "flask-secret-key"
+description = "Flask hardcoded SECRET_KEY"
+regex       = '''SECRET_KEY\s*=\s*["\'][^"\']{8,}["\']'''
+tags        = ["flask", "secret"]
+severity    = "HIGH"
+
+[allowlist]
+  description = "Faux secrets de démonstration (non réels)"
+  paths       = ['''fake_secret_demo\.py''']
