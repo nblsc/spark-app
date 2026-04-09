@@ -5,16 +5,8 @@ const CARD_COLORS = [
 ];
 const CARD_EMOJIS = ["🎞️","🏔️","🎨","🏙️","🐠","✍️","🎸","🌿","🎭","🚀","🌊","🦋"];
 
-// FIX : Suppression totale du localStorage pour la gestion de session.
-// La session est désormais gérée côté serveur via cookie HttpOnly (Flask-Login).
-// Le localStorage ne stocke plus que les préférences UI non sensibles (compteur de notes).
 
 // ─── UTILS SÉCURITÉ ───────────────────────────────────────────────────────────
-
-/**
- * FIX ANTI-XSS : échappe tous les caractères HTML dangereux avant injection dans le DOM.
- * À utiliser systématiquement pour toute donnée venant du serveur.
- */
 function escapeHtml(str) {
   if (!str) return '';
   return String(str)
@@ -25,9 +17,8 @@ function escapeHtml(str) {
     .replace(/'/g, '&#39;');
 }
 
+
 // ─── STATE LOCAL (non sensible) ───────────────────────────────────────────────
-// FIX : seul le compteur de notes (non sensible) reste en localStorage.
-// L'identité de l'utilisateur n'est JAMAIS stockée côté client.
 function getLocalState(userId) {
   try {
     const saved = JSON.parse(localStorage.getItem('spark_state_' + userId));
@@ -46,6 +37,7 @@ function getLocalState(userId) {
 function saveLocalState(userId, s) {
   localStorage.setItem('spark_state_' + userId, JSON.stringify(s));
 }
+
 
 // ─── AUTH ─────────────────────────────────────────────────────────────────────
 let currentUser = null;
@@ -71,13 +63,11 @@ async function doLogin() {
     const res = await fetch('/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      // FIX : credentials:'include' pour que le cookie de session soit envoyé/reçu
       credentials: 'include',
       body: JSON.stringify({ email, password })
     });
     const data = await res.json();
     if (!res.ok) return showError('loginError', data.error || 'Erreur de connexion.');
-    // FIX : on ne stocke PLUS l'email dans localStorage — la session vit dans le cookie
     startApp(data.user);
   } catch(e) {
     showError('loginError', 'Impossible de contacter le serveur.');
@@ -112,7 +102,6 @@ async function doRegister() {
     });
     const data = await res.json();
     if (!res.ok) return showError('registerError', data.error || "Erreur lors de l'inscription.");
-
     startApp(data.user);
     showToast(`Bienvenue ${escapeHtml(name)} ! 🎉`, 'success');
   } catch(e) {
@@ -138,7 +127,6 @@ async function startApp(user) {
   document.getElementById('authScreen').classList.add('hidden');
   document.getElementById('appScreen').classList.remove('hidden');
 
-  // Recharge le profil depuis le serveur (source de vérité)
   try {
     const res = await fetch('/api/profile/me', { credentials: 'include' });
     const data = await res.json();
@@ -154,7 +142,6 @@ async function startApp(user) {
   } catch(e) {}
 
   const todayStr = new Date().toDateString();
-  // FIX : on utilise l'ID (non sensible) comme clé de state local
   state = getLocalState(currentUser.id) || {
     date: todayStr,
     notesLeft: 4,
@@ -167,6 +154,7 @@ async function startApp(user) {
   updateNotesUI();
   fetchUnreadCount();
 }
+
 
 // ─── DECK ─────────────────────────────────────────────────────────────────────
 let deck = [];
@@ -192,6 +180,7 @@ async function buildDeck() {
   }
 }
 
+
 // ─── RENDER ──────────────────────────────────────────────────────────────────
 function buildCard(profile) {
   const card = document.createElement('div');
@@ -202,8 +191,6 @@ function buildCard(profile) {
     ? `<img src="${escapeHtml(profile.profile_photo)}" style="width:100%;height:100%;object-fit:cover;" />`
     : `<div style="width:100%;height:100%;background:linear-gradient(160deg,${escapeHtml(profile.color)} 0%,#0c0c0f 100%);display:flex;align-items:center;justify-content:center;font-size:120px;filter:saturate(0.8);">${escapeHtml(profile.emoji)}</div>`;
 
-  // FIX : toutes les données dynamiques sont passées dans escapeHtml() avant
-  // injection dans innerHTML, ce qui neutralise les payloads XSS résiduels.
   const tagsHtml = (profile.tags || [])
     .map(t => `<span class="tag">${escapeHtml(t)}</span>`)
     .join('');
@@ -263,6 +250,7 @@ function updateNotesUI() {
     noteBtn.style.pointerEvents = state.notesLeft > 0 ? 'all' : 'none';
   }
 }
+
 
 // ─── DRAG ────────────────────────────────────────────────────────────────────
 let isDragging = false;
@@ -334,6 +322,11 @@ function onDragEnd() {
 
 function flyOut(direction) {
   if (!activeCard) return;
+
+  // FIX : capture locale du profil au moment exact du swipe
+  // évite que topCardProfile soit écrasé par renderDeck() avant l'affichage du toast
+  const swipedProfile = topCardProfile;
+
   const x = direction === 'right' ? 600 : -600;
   const rotate = direction === 'right' ? 30 : -30;
   activeCard.style.transition = 'transform 0.45s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
@@ -341,14 +334,14 @@ function flyOut(direction) {
   activeCard = null;
 
   if (direction === 'right') {
-    showToast(`Tu as liké ${escapeHtml(topCardProfile.name)} ❤️`, 'success');
+    showToast(`Tu as liké ${escapeHtml(swipedProfile.name)} ❤️`, 'success');
     fetch('/api/matches/like', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
-      body: JSON.stringify({ liked_user_id: topCardProfile.id })
+      body: JSON.stringify({ liked_user_id: swipedProfile.id })
     }).then(res => res.json()).then(data => {
-      if (data.matched) showToast(`🎉 Match avec ${escapeHtml(topCardProfile.name)} !`, 'success');
+      if (data.matched) showToast(`🎉 Match avec ${escapeHtml(swipedProfile.name)} !`, 'success');
     }).catch(() => {});
   } else {
     showToast('Profil suivant →', 'info');
@@ -367,6 +360,7 @@ function swipeCard(direction) {
   if (!activeCard) return;
   flyOut(direction);
 }
+
 
 // ─── NOTE MODAL ──────────────────────────────────────────────────────────────
 function openNoteModal() {
@@ -393,20 +387,24 @@ async function sendNote() {
   const text = document.getElementById('noteText').value.trim();
   if (!text || state.notesLeft <= 0) return;
 
+  // FIX : capture locale du profil pour éviter un changement de topCardProfile
+  // pendant l'attente de la réponse serveur ou du setTimeout suivant
+  const targetProfile = topCardProfile;
+
   try {
     await fetch('/api/messages/send', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
-      body: JSON.stringify({ receiver_id: topCardProfile.id, content: text })
+      body: JSON.stringify({ receiver_id: targetProfile.id, content: text })
     });
   } catch(e) {
     console.error('Erreur envoi message:', e);
   }
 
   const note = {
-    to: topCardProfile.name,
-    toId: topCardProfile.id,
+    to: targetProfile.name,
+    toId: targetProfile.id,
     text,
     time: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
   };
@@ -419,6 +417,7 @@ async function sendNote() {
   setTimeout(() => swipeCard('right'), 300);
   updateNotesUI();
 }
+
 
 // ─── NOTES PANEL ─────────────────────────────────────────────────────────────
 function toggleNotesPanel() {
@@ -433,7 +432,6 @@ function renderNotesList() {
     list.innerHTML = '<div class="no-notes">Aucune note envoyée aujourd\'hui.</div>';
     return;
   }
-  // FIX : escapeHtml sur le contenu des notes avant injection innerHTML
   list.innerHTML = state.sentNotes.map(n => `
     <div class="note-item">
       <div class="note-item-name">À ${escapeHtml(n.to)} ❤️</div>
@@ -442,6 +440,7 @@ function renderNotesList() {
     </div>
   `).join('');
 }
+
 
 // ─── NAVIGATION ──────────────────────────────────────────────────────────────
 function showSwipeScreen() {
@@ -487,7 +486,6 @@ async function renderMatchesList() {
       list.innerHTML = '<div class="no-notes">Aucun match pour l\'instant 💫</div>';
       return;
     }
-    // FIX : escapeHtml sur toutes les données affichées
     list.innerHTML = data.matches.map(u => `
       <div class="match-item">
         <div class="match-avatar">${u.profile_photo
@@ -513,7 +511,6 @@ function renderProfilePanel() {
     ? `<img src="${escapeHtml(currentUser.profile_photo)}" alt="photo" />`
     : (currentUser.emoji || '👤');
 
-  // FIX : toutes les valeurs utilisateur sont échappées
   content.innerHTML = `
     <div class="profile-avatar-wrapper">
       <div class="profile-avatar" onclick="document.getElementById('photoInput').click()">
@@ -548,7 +545,6 @@ function renderProfilePanel() {
 async function handlePhotoUpload(event) {
   const file = event.target.files[0];
   if (!file) return;
-  // FIX : validation du type MIME côté client (doublée côté serveur)
   if (!file.type.startsWith('image/')) {
     showToast('Fichier non autorisé', 'error');
     return;
@@ -617,6 +613,7 @@ async function saveProfile() {
   }
 }
 
+
 // ─── UNREAD COUNT ─────────────────────────────────────────────────────────────
 async function fetchUnreadCount() {
   try {
@@ -637,15 +634,17 @@ async function fetchUnreadCount() {
   } catch(e) {}
 }
 
+
 // ─── TOAST ───────────────────────────────────────────────────────────────────
 function showToast(msg, type = 'info') {
   const container = document.getElementById('toastContainer');
   const toast = document.createElement('div');
   toast.className = `toast ${type}`;
-  toast.textContent = msg; // textContent = pas d'injection HTML possible
+  toast.textContent = msg;
   container.appendChild(toast);
   setTimeout(() => toast.remove(), 2600);
 }
+
 
 // ─── EVENTS ──────────────────────────────────────────────────────────────────
 document.getElementById('noteText').addEventListener('input', function () {
@@ -662,9 +661,8 @@ document.addEventListener('keydown', function(e) {
   }
 });
 
+
 // ─── INIT ────────────────────────────────────────────────────────────────────
-// FIX : au lieu de lire le localStorage, on interroge le serveur.
-// Si le cookie de session est valide, le serveur renvoie le profil, sinon 401.
 (async () => {
   try {
     const res = await fetch('/api/profile/me', { credentials: 'include' });
@@ -676,5 +674,4 @@ document.addEventListener('keydown', function(e) {
       }
     }
   } catch(e) {}
-  // Pas de session valide → on reste sur l'écran de connexion
 })();
