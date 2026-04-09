@@ -18,7 +18,7 @@ function escapeHtml(str) {
 }
 
 
-// ─── STATE LOCAL (non sensible) ───────────────────────────────────────────────
+// ─── STATE LOCAL ──────────────────────────────────────────────────────────────
 function getLocalState(userId) {
   try {
     const saved = JSON.parse(localStorage.getItem('spark_state_' + userId));
@@ -232,8 +232,10 @@ function renderDeck() {
   actionsEl.style.opacity = '';
   actionsEl.style.pointerEvents = '';
 
-  const visible = deck.slice(0, 3).reverse();
-  visible.forEach(profile => stack.appendChild(buildCard(profile)));
+  // FIX : deck[2] inséré en premier, deck[0] inséré en dernier (last-child)
+  // → le CSS nth-last-child(1) lui donne z-index max = carte du dessus
+  const visible = deck.slice(0, 3);
+  visible.reverse().forEach(profile => stack.appendChild(buildCard(profile)));
 
   topCardProfile = deck[0];
   attachDragHandlers();
@@ -259,6 +261,7 @@ let activeCard = null;
 let topCardProfile = null;
 
 function attachDragHandlers() {
+  // FIX : last-child = deck[0] = carte du dessus
   const card = document.querySelector('#stack .card:last-child');
   if (!card) return;
   card.addEventListener('mousedown', onDragStart);
@@ -266,10 +269,16 @@ function attachDragHandlers() {
 }
 
 function onDragStart(e) {
+  // FIX : re-sélection explicite du last-child au moment du drag
+  const topCard = document.querySelector('#stack .card:last-child');
+  if (!topCard) return;
+
   startX = e.type === 'touchstart' ? e.touches[0].clientX : e.clientX;
   isDragging = true;
-  activeCard = document.querySelector('#stack .card:last-child');
+  currentX = 0;
+  activeCard = topCard;
   activeCard.style.transition = 'none';
+
   document.addEventListener('mousemove', onDragMove);
   document.addEventListener('mouseup', onDragEnd);
   document.addEventListener('touchmove', onDragMove, { passive: false });
@@ -323,8 +332,7 @@ function onDragEnd() {
 function flyOut(direction) {
   if (!activeCard) return;
 
-  // FIX : capture locale du profil au moment exact du swipe
-  // évite que topCardProfile soit écrasé par renderDeck() avant l'affichage du toast
+  // Capture locale du profil au moment exact du swipe
   const swipedProfile = topCardProfile;
 
   const x = direction === 'right' ? 600 : -600;
@@ -387,8 +395,7 @@ async function sendNote() {
   const text = document.getElementById('noteText').value.trim();
   if (!text || state.notesLeft <= 0) return;
 
-  // FIX : capture locale du profil pour éviter un changement de topCardProfile
-  // pendant l'attente de la réponse serveur ou du setTimeout suivant
+  // Capture locale du profil pour éviter un changement pendant l'attente serveur
   const targetProfile = topCardProfile;
 
   try {
@@ -429,7 +436,7 @@ function toggleNotesPanel() {
 function renderNotesList() {
   const list = document.getElementById('notesList');
   if (!state.sentNotes || state.sentNotes.length === 0) {
-    list.innerHTML = '<div class="no-notes">Aucune note envoyée aujourd\'hui.</div>';
+    list.innerHTML = "<div class=\"no-notes\">Aucune note envoyée aujourd'hui.</div>";
     return;
   }
   list.innerHTML = state.sentNotes.map(n => `
@@ -483,7 +490,7 @@ async function renderMatchesList() {
     const res = await fetch('/api/matches/', { credentials: 'include' });
     const data = await res.json();
     if (!res.ok || data.matches.length === 0) {
-      list.innerHTML = '<div class="no-notes">Aucun match pour l\'instant 💫</div>';
+      list.innerHTML = "<div class=\"no-notes\">Aucun match pour l'instant 💫</div>";
       return;
     }
     list.innerHTML = data.matches.map(u => `

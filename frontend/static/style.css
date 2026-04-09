@@ -120,11 +120,26 @@ body::after {
   transition: transform 0.15s ease;
   will-change: transform;
   touch-action: none;
+  pointer-events: none;
 }
 .card:active { cursor: grabbing; }
-.card:nth-child(1) { z-index: 3; }
-.card:nth-child(2) { z-index: 2; transform: scale(0.96) translateY(14px); }
-.card:nth-child(3) { z-index: 1; transform: scale(0.92) translateY(28px); }
+
+/* FIX : renderDeck() insère deck[2] en premier et deck[0] en dernier (last-child).
+   nth-last-child(1) = deck[0] = carte du dessus → z-index max + pointer-events actifs. */
+.card:nth-last-child(1) {
+  z-index: 30;
+  pointer-events: auto;
+}
+.card:nth-last-child(2) {
+  z-index: 20;
+  transform: scale(0.96) translateY(14px);
+  pointer-events: none;
+}
+.card:nth-last-child(3) {
+  z-index: 10;
+  transform: scale(0.92) translateY(28px);
+  pointer-events: none;
+}
 
 .card-gradient {
   position: absolute;
@@ -559,9 +574,7 @@ body::after {
   appearance: none;
 }
 .profile-save-btn:hover { transform: translateY(-1px); box-shadow: 0 8px 24px rgba(255,77,109,0.4); }
-.profile-photo-upload {
-  display: none;
-}
+.profile-photo-upload { display: none; }
 .profile-photo-label {
   position: absolute;
   bottom: 0; right: 0;
