@@ -84,7 +84,7 @@ jobs:
         run: pip install bandit
 
       - name: Lancer Bandit
-        run: bandit -r backend/ -ll -x backend/__pycache__ -s B104
+        run: bandit -r backend/ -ll -x backend/__pycache__ -s B104 #ignore l'erreur du 0.0.0.0
 
   pip-audit:
     name: Sécurité Dépendances (pip-audit)
@@ -109,7 +109,7 @@ jobs:
 
 
   build:
-    name: Build
+    name: Build (python)
     runs-on: ubuntu-latest
     #  Lab 5 — Attend tous les jobs de test (needs)
     needs: [secret-scan, lint, bandit, pip-audit]
