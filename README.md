@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="logo.png" alt="Logo de l'application Spark" width="200"/>
+<img src="logo.png" alt="Logo de l'application Spark" width="400"/>
 
 # Spark
 
