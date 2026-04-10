@@ -61,4 +61,8 @@ Notre approche met l'accent sur la protection des données et la robustesse du c
 
 Si vous souhaitez tester l'application sans configurer l'environnement de développement, vous pouvez utiliser les images pré-construites sur Docker Hub.
 
+**Méthode 1 :** Terminal (ligne de commande)
+Lancez l'application sur le port de votre choix
+
+
 
