@@ -1,15 +1,17 @@
 <div align="center">
 
-<img src="https://via.placeholder.com/200" alt="Logo du projet" width="200"/>
+<img src="https://via.placeholder.com/200" alt="Logo de l'application Spark" width="200"/>
 
-# Nom de ton Projet
+# Spark
 
-**Une courte phrase qui décrit ton projet (le slogan).**
+**Application Web de Rencontre**
 
-[![GitHub stars](https://img.shields.io/github/stars/TON_UTILISATEUR/TON_REPO?style=for-the-badge)](https://github.com/mrwn111/app-dating/stargazers)
-[![GitHub release](https://img.shields.io/github/v/release/TON_UTILISATEUR/TON_REPO?style=for-the-badge)](https://github.com/mrwn111/app-dating/releases)
-[![License](https://img.shields.io/github/license/TON_UTILISATEUR/TON_REPO?style=for-the-badge)](https://github.com/mrwn111/app-dating/blob/main/LICENSE)
-[![CI Build](https://img.shields.io/github/actions/workflow/status/TON_UTILISATEUR/TON_REPO/main.yml?style=for-the-badge&label=CI%20BUILD)](https://github.com/mrwn111/app-dating/actions)
+**(16/03 - 10/04)**
+
+[![GitHub stars](https://img.shields.io/github/stars/mrwn111/app-dating?style=for-the-badge)](https://github.com/mrwn111/app-dating/stargazers)
+[![GitHub release](https://img.shields.io/github/v/release/mrwn111/app-dating?style=for-the-badge)](https://github.com/mrwn111/app-dating/releases)
+[![License](https://img.shields.io/github/license/mrwn111/app-dating?style=for-the-badge)](https://github.com/mrwn111/app-dating/blob/main/LICENSE)
+[![CI Build](https://img.shields.io/github/actions/workflow/status/mrwn111/app-dating/main.yml?style=for-the-badge&label=CI%20BUILD)](https://github.com/mrwn111/app-dating/actions)
 
 </div>
 
@@ -17,22 +19,8 @@
 
 ## ℹ️ À propos (About)
 
-[Nom de ton projet] est un outil/logiciel qui permet de [décrire la fonction principale]. Offrant [mentionner un ou deux points forts, ex: une faible latence, une grande flexibilité] avec le support de [mentionner les technologies ou langages principaux]. 
+Spark est une application de rencontre développée dans le cadre d'un projet de DevSecOps. L'objectif principal est de proposer une solution de rencontre simple, OpenSource et sécurisée.
 
-Vous pouvez vous connecter à [Nom de ton projet] depuis [mentionner les clients/appareils compatibles]. Une interface [web / ligne de commande / graphique] est fournie pour permettre la configuration facilement.
-
-
-
-
-
-## Spark - Application Web de Rencontre
-
-** 16/03 - 10/04 **
-
-
-  A PROPOS
-
-Spark est une application de rencontre, ayant été creer dans le cadre d'un projet de DevSecOps.
-L'objectif est de proposer une solution de rencontre simple et sécurisé OpenSource. 
+Notre approche met l'accent sur la protection des données et la robustesse du code pour garantir une expérience de confiance aux utilisateurs.
 
 
