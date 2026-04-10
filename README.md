@@ -54,10 +54,11 @@ Notre approche met l'accent sur la protection des données et la robustesse du c
 - **Trivy - Faux positif JWT dans `fake_secret_demo.py`** : Trivy détectait le JWT de démonstration et faisait échouer le scan pré-build.
   **Fix** : ajout de `fake_secret_demo.py` dans `.trivyignore`.
 
-
+- **Bandit - Alerte B104 (Hardcoded bind  to all interfaces)** : Bandit bloquait la pipeline car Flask doit écouter sur 0.0.0.0 pour que le mapping de port avec l'hôte fonctionne.
+  **Fix** : Ajout du flag -s B104 dans la commande Bandit de la pipeline pour ignorer cette alerte spécifique au contexte de conteneurisation.
 
 ## 📦 Guide d'installation
 
-
+Si vous souhaitez tester l'application sans configurer l'environnement de développement, vous pouvez utiliser les images pré-construites sur Docker Hub.
 
 
