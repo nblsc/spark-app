@@ -60,6 +60,7 @@ Notre approche met l'accent sur la protection des données et la robustesse du c
 ## 📦 Guide d'installation
 
 L'application est disponible sur Docker Hub sous le nom `nblsc/mon-app`.
+
 ***Note sur le port** : Par défaut, l'application tourne sur le port 5000 à l'intérieur du conteneur. Si ce port est déjà utilisé sur votre machine, utilisez un autre port disponible comme le 8080 par exemple.*
 
 **Méthode 1 :** Terminal (Ligne de Commande)
