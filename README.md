@@ -55,7 +55,7 @@ Notre approche met l'accent sur la protection des données et la robustesse du c
   **Fix** : ajout de `fake_secret_demo.py` dans `.trivyignore`.
 
 - **Bandit - Alerte B104 (Hardcoded bind  to all interfaces)** : Bandit bloquait la pipeline car Flask doit écouter sur 0.0.0.0 pour que le mapping de port avec l'hôte fonctionne.
-  **Fix** : Ajout du flag -s B104 dans la commande Bandit de la pipeline pour ignorer cette alerte spécifique au contexte de conteneurisation.
+  **Fix** : Ajout du flag `-s B104` dans la commande Bandit de la pipeline pour ignorer cette alerte spécifique au contexte de conteneurisation.
 
 ## 📦 Guide d'installation
 
