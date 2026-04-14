@@ -312,7 +312,7 @@ jobs:
     name: Push GHCR & Deploy Render
     runs-on: ubuntu-24.04
     needs: [dast]
-    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev') && github.event_name == 'push'
+    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev') && (github.event_name == 'push' || github.event_name == 'pull_request')
     steps:
       - name: Checkout du code
         uses: actions/checkout@v4
