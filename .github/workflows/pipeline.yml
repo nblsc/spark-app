@@ -306,31 +306,33 @@ jobs:
         run: docker stop mon-app-dast && docker rm mon-app-dast
 
 
-  push-dockerhub:
-    name: Push DockerHub
+  push-deploy:
+    name: Push GHCR & Deploy Render
     runs-on: ubuntu-24.04
     needs: [dast]
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev') && github.event_name == 'push'
     steps:
       - name: Checkout du code
         uses: actions/checkout@v4
 
-      - name: Se connecter à DockerHub
+      - name: Se connecter à GHCR
         uses: docker/login-action@v3
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Extraire les métadonnées Docker
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ secrets.DOCKERHUB_USERNAME }}/mon-app
+          images: ghcr.io/${{ github.repository }}
           tags: |
-            type=sha,prefix=sha-
             type=raw,value=latest
+            type=raw,value=dev
+            type=sha,prefix=sha-
 
-      - name: Build et Push vers DockerHub (image Distroless finale)
+      - name: Build et Push vers GHCR
         uses: docker/build-push-action@v5
         with:
           context: .
