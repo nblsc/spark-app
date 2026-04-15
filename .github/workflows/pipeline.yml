@@ -311,6 +311,9 @@ jobs:
   push-deploy:
     name: Push GHCR & Deploy Render
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
     needs: [dast]
     if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev') && (github.event_name == 'push' || github.event_name == 'pull_request')
     steps:
