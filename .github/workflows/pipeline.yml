@@ -170,7 +170,7 @@ jobs:
     name: Build (Python)
     runs-on: ubuntu-24.04
     needs: [secret-scan, secret-scan-trufflehog, lint, bandit, semgrep, pip-audit]
-    if: always() && !failure() && !cancelled()
+    if: always() && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')
     steps:
       - name: Checkout du code
         uses: actions/checkout@v4
