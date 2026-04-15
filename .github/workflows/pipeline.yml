@@ -195,6 +195,7 @@ jobs:
     name: Scan Pré-Build (Trivy FS + Config)
     runs-on: ubuntu-24.04
     needs: [build]
+    if: ${{ !failure() && !cancelled() }}
     steps:
       - name: Checkout du code
         uses: actions/checkout@v4
@@ -226,6 +227,7 @@ jobs:
     name: Docker — Build Multi-Stage Distroless & Scan Post-Build (Trivy)
     runs-on: ubuntu-24.04
     needs: [trivy-pre-build]
+    if: ${{ !failure() && !cancelled() }}
     steps:
       - name: Checkout du code
         uses: actions/checkout@v4
@@ -255,6 +257,7 @@ jobs:
     name: DAST — Scan Runtime (Nikto)
     runs-on: ubuntu-24.04
     needs: [docker]
+    if: ${{ !failure() && !cancelled() }}
     steps:
       - name: Checkout du code
         uses: actions/checkout@v4
@@ -315,7 +318,7 @@ jobs:
       contents: read
       packages: write
     needs: [dast]
-    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev') && (github.event_name == 'push' || github.event_name == 'pull_request')
+    if: ${{ !failure() && !cancelled() && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev') && (github.event_name == 'push' || github.event_name == 'pull_request') }}
     steps:
       - name: Checkout du code
         uses: actions/checkout@v4
