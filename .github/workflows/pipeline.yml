@@ -323,6 +323,10 @@ jobs:
       - name: Checkout du code
         uses: actions/checkout@v4
 
+      - name: Lowercase image name
+        run: |
+          echo "IMAGE_NAME=ghcr.io/${{ github.repository }}" | tr '[:upper:]' '[:lower:]' >> $GITHUB_ENV
+
       - name: Se connecter à GHCR
         uses: docker/login-action@v3
         with:
