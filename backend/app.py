@@ -42,6 +42,11 @@ def create_app():
     @app.route('/api/health', methods=['GET'])
     def health():
         return jsonify({'status': 'OK'}), 200
+    
+    @app.route('/')
+    def index():
+        raise Exception("Bug critique en production !") 
+        return render_template('index.html')
 
     @app.route('/', methods=['GET'])
     @app.route('/index', methods=['GET'])
