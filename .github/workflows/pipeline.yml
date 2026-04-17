@@ -170,7 +170,7 @@ jobs:
     name: Build (Python)
     runs-on: ubuntu-24.04
     needs: [secret-scan, secret-scan-trufflehog, lint, bandit, semgrep, pip-audit]
-    if: always() && !failure() && !cancelled()
+    if: always() && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')
     steps:
       - name: Checkout du code
         uses: actions/checkout@v4
@@ -195,6 +195,7 @@ jobs:
     name: Scan Pré-Build (Trivy FS + Config)
     runs-on: ubuntu-24.04
     needs: [build]
+    if: ${{ !failure() && !cancelled() }}
     steps:
       - name: Checkout du code
         uses: actions/checkout@v4
@@ -226,6 +227,7 @@ jobs:
     name: Docker — Build Multi-Stage Distroless & Scan Post-Build (Trivy)
     runs-on: ubuntu-24.04
     needs: [trivy-pre-build]
+    if: ${{ !failure() && !cancelled() }}
     steps:
       - name: Checkout du code
         uses: actions/checkout@v4
@@ -255,6 +257,7 @@ jobs:
     name: DAST — Scan Runtime (Nikto)
     runs-on: ubuntu-24.04
     needs: [docker]
+    if: ${{ !failure() && !cancelled() }}
     steps:
       - name: Checkout du code
         uses: actions/checkout@v4
@@ -311,18 +314,25 @@ jobs:
   push-deploy:
     name: Push GHCR & Deploy Render
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
     needs: [dast]
-    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev') && (github.event_name == 'push' || github.event_name == 'pull_request')
+    if: ${{ !failure() && !cancelled() && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev') && (github.event_name == 'push' || github.event_name == 'pull_request') }}
     steps:
       - name: Checkout du code
         uses: actions/checkout@v4
+
+      - name: Lowercase image name
+        run: |
+          echo "IMAGE_NAME=ghcr.io/${{ github.repository }}" | tr '[:upper:]' '[:lower:]' >> $GITHUB_ENV
 
       - name: Se connecter à GHCR
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          password: ${{ secrets.CR_PAT }}
 
       - name: Extraire les métadonnées Docker
         id: meta
@@ -339,5 +349,13 @@ jobs:
         with:
           context: .
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }} #probleme pi
+          tags: | 
+            ${{ steps.meta.outputs.tags }}
+            ghcr.io/nblsc/spark-app:latest
+            ghcr.io/nblsc/spark-app:dev
+            ghcr.io/nblsc/spark-app:sha-${{ github.sha }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+      - name: Déclencher le déploiement sur Render (Test)
+        if: github.ref == 'refs/heads/dev'
+        run: curl -X POST ${{ secrets.RENDER_HOOK_TEST }}
