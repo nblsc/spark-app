@@ -47,5 +47,5 @@ class ProductionConfig(Config):
 class TestingConfig(Config):
     TESTING = True
     SQLALCHEMY_DATABASE_URI = 'sqlite:///:memory:'
-    SECRET_KEY = 'test-secret-key-only'  # Exception autorisée pour les tests
+    SECRET_KEY = os.getenv('SECRET_KEY')   # Exception autorisée pour les tests
     
