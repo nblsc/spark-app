@@ -355,8 +355,6 @@ jobs:
             ghcr.io/nblsc/spark-app:dev
             ghcr.io/nblsc/spark-app:sha-${{ github.sha }}
           labels: ${{ steps.meta.outputs.labels }}
-          labels: ${{ steps.meta.outputs.labels }}
-
       - name: Déclencher le déploiement sur Render (Test)
         if: github.ref == 'refs/heads/dev'
         run: curl -X POST ${{ secrets.RENDER_HOOK_TEST }}
