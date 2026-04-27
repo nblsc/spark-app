@@ -42,7 +42,7 @@ def create_app():
     @app.route('/api/health', methods=['GET'])
     def health():
         return jsonify({
-            'status': 'OK',
+            'status': 'KO',
             'instance': socket.gethostname()
         }), 200
 
