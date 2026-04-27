@@ -6,3 +6,5 @@ python-dotenv
 werkzeug
 # FIX : bleach pour la sanitisation XSS côté serveur
 bleach
+pymysql
+cryptography
