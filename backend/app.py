@@ -1,4 +1,5 @@
 import os
+import time
 import socket
 from dotenv import load_dotenv
 from flask import Flask, jsonify, render_template
@@ -37,7 +38,17 @@ def create_app():
         return User.query.get(int(user_id))
 
     with app.app_context():
-        db.create_all()
+        retries = 10
+        for i in range(retries):
+            try:
+                db.create_all()
+                print("✅ Connexion MySQL OK — tables créées")
+                break
+            except Exception as e:
+                print(f"⏳ Attente MySQL... tentative {i+1}/{retries} ({e})")
+                time.sleep(3)
+        else:
+            raise RuntimeError("❌ Impossible de se connecter à MySQL après plusieurs tentatives")
 
     @app.route('/api/health', methods=['GET'])
     def health():
