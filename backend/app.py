@@ -1,4 +1,5 @@
 import os
+import socket
 from dotenv import load_dotenv
 from flask import Flask, jsonify, render_template
 from flask_login import LoginManager
@@ -22,7 +23,6 @@ def create_app():
         from config import DevelopmentConfig
         app.config.from_object(DevelopmentConfig)
 
-    # FIX : CORS restreint à l'origine de l'appli, pas "*"
     allowed_origins = os.getenv('ALLOWED_ORIGINS', 'http://localhost:5000').split(',')
     CORS(app, resources={r"/api/*": {"origins": allowed_origins}}, supports_credentials=True)
 
@@ -41,7 +41,10 @@ def create_app():
 
     @app.route('/api/health', methods=['GET'])
     def health():
-        return jsonify({'status': 'OK'}), 200
+        return jsonify({
+            'status': 'OK',
+            'instance': socket.gethostname()
+        }), 200
 
     @app.route('/', methods=['GET'])
     @app.route('/index', methods=['GET'])
@@ -65,8 +68,4 @@ def create_app():
 
 if __name__ == '__main__':
     app = create_app()
-    # FIX : debug=False — ne jamais lancer avec debug=True sur un port public
     app.run(debug=False, host='0.0.0.0', port=5000)
-    
-    
-    # test1334667
