@@ -376,7 +376,7 @@ jobs:
             -e FLASK_ENV=production \
             -e DATABASE_URL=sqlite:////app/data/dating_app.db \
             -e SECRET_KEY=changeme \
-            ghcr.io/nblsc/spark-app:sha-${{ github.sha }}
+            ghcr.io/nblsc/spark-app:sha-${{ github.sha }}    # Utiliser le tag SHA pour garantir le déploiement de la bonne version
 
       - name: Health check GREEN
         id: health
