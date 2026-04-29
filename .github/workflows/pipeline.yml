@@ -335,7 +335,7 @@ jobs:
             type=sha,prefix=sha-
 
       - name: Build et Push vers GHCR
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v5   #type=buildx
         with:
           context: .
           push: true
