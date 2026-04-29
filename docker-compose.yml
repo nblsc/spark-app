@@ -1,0 +1,49 @@
+services:
+  db:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: sparkdb
+      MYSQL_USER: sparkuser
+      MYSQL_PASSWORD: sparkpassword
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-prootpassword"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - spark_network
+
+  web:
+    build: .
+    image: spark-app:latest
+    environment:
+      - FLASK_ENV=production
+      - DATABASE_URL=mysql+pymysql://sparkuser:sparkpassword@db:3306/sparkdb
+      - SECRET_KEY=changeme
+      - ALLOWED_ORIGINS=http://localhost:80
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - spark_network
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - web
+    networks:
+      - spark_network
+
+volumes:
+  mysql_data:
+
+networks:
+  spark_network:
+    driver: bridge

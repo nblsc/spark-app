@@ -9,7 +9,6 @@ on:
 
 jobs:
 
-
   detect-changes:
     name: Detect Changes
     runs-on: ubuntu-24.04
@@ -27,7 +26,6 @@ jobs:
             python:
               - '**/*.py'
               - 'backend/requirements.txt'
-
 
   secret-scan:
     name: Scan Secrets (Gitleaks + règle custom)
@@ -165,7 +163,6 @@ jobs:
       - name: Lancer pip-audit
         run: pip-audit -r backend/requirements.txt
 
-
   build:
     name: Build (Python)
     runs-on: ubuntu-24.04
@@ -189,7 +186,6 @@ jobs:
         run: |
           cd backend
           python -c "import app; print('App importée avec succès')"
-
 
   trivy-pre-build:
     name: Scan Pré-Build (Trivy FS + Config)
@@ -222,7 +218,6 @@ jobs:
           severity: CRITICAL,HIGH,MEDIUM
           skip-files: "fake_secret_demo.py"
 
-
   docker:
     name: Docker — Build Multi-Stage Distroless & Scan Post-Build (Trivy)
     runs-on: ubuntu-24.04
@@ -232,15 +227,12 @@ jobs:
       - name: Checkout du code
         uses: actions/checkout@v4
 
-      # Build le stage intermédiaire uniquement (vérifie que les deps s'installent)
       - name: Build stage builder (intermédiaire)
         run: docker build --target builder -t mon-app-builder:${{ github.sha }} .
 
-      # Build l'image finale multi-stage → stage Distroless
       - name: Build image finale (Distroless)
         run: docker build -t mon-app:${{ github.sha }} .
 
-      # Bonus — Scan POST-BUILD : scanne l'image Distroless finale produite
       - name: Scan post-build de l'image Distroless (Trivy)
         uses: aquasecurity/trivy-action@master
         with:
@@ -251,7 +243,6 @@ jobs:
           vuln-type: os,library
           severity: CRITICAL,HIGH,MEDIUM
           trivyignores: .trivyignore
-
 
   dast:
     name: DAST — Scan Runtime (Nikto)
@@ -310,7 +301,6 @@ jobs:
         if: always()
         run: docker stop mon-app-dast && docker rm mon-app-dast
 
-
   push-deploy:
     name: Push GHCR & Deploy Render
     runs-on: ubuntu-24.04
@@ -349,7 +339,7 @@ jobs:
         with:
           context: .
           push: true
-          tags: | 
+          tags: |
             ${{ steps.meta.outputs.tags }}
             ghcr.io/nblsc/spark-app:latest
             ghcr.io/nblsc/spark-app:dev
@@ -359,3 +349,75 @@ jobs:
       - name: Déclencher le déploiement sur Render (Test)
         if: github.ref == 'refs/heads/dev'
         run: curl -X POST ${{ secrets.RENDER_HOOK_TEST }}
+
+  blue-green-deploy:
+    name: Blue/Green Deploy + Rollback automatique
+    runs-on: ubuntu-24.04
+    needs: [push-deploy]
+    if: ${{ !failure() && !cancelled() && github.ref == 'refs/heads/main' }}
+    steps:
+      - name: Checkout du code
+        uses: actions/checkout@v4
+
+      - name: Login GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.CR_PAT }}
+
+      - name: Démarrer GREEN (nouvelle version)
+        run: |
+          docker network create spark-net || true
+          docker run -d \
+            --name green \
+            --network spark-net \
+            -p 5000:5000 \
+            -e FLASK_ENV=production \
+            -e DATABASE_URL=sqlite:////app/data/dating_app.db \
+            -e SECRET_KEY=changeme \
+            ghcr.io/nblsc/spark-app:sha-${{ github.sha }}    # Utiliser le tag SHA pour garantir le déploiement de la bonne version
+
+      - name: Health check GREEN
+        id: health
+        run: |
+          echo "Attente du démarrage de GREEN..."
+          for i in $(seq 1 15); do
+            STATUS=$(curl -sf http://localhost:5000/api/health | python3 -c "import sys,json; print(json.load(sys.stdin)['status'])" 2>/dev/null || echo "KO")
+            if [ "$STATUS" = "OK" ]; then
+              echo "GREEN est healthy ✅"
+              echo "result=success" >> $GITHUB_OUTPUT
+              exit 0
+            fi
+            echo "Tentative $i/15 — pas encore prêt..."
+            sleep 3
+          done
+          echo "GREEN KO ❌"
+          echo "result=failure" >> $GITHUB_OUTPUT
+          exit 1
+
+      - name: Basculer vers GREEN (si healthy)
+        if: steps.health.outputs.result == 'success'
+        run: |
+          echo "✅ GREEN validé — bascule vers la nouvelle version"
+          docker stop green && docker rm green
+          echo "Déploiement GREEN → production terminé"
+
+      - name: Rollback vers BLUE (si GREEN KO)
+        if: failure() && steps.health.outputs.result == 'failure'
+        run: |
+          echo "❌ GREEN KO — Rollback vers la version précédente (BLUE)"
+          docker stop green || true
+          docker rm green || true
+          docker run -d \
+            --name blue-rollback \
+            --network spark-net \
+            -e FLASK_ENV=production \
+            -e DATABASE_URL=sqlite:////app/data/dating_app.db \
+            -e SECRET_KEY=changeme \
+            ghcr.io/nblsc/spark-app:latest
+          echo "✅ Rollback effectué — BLUE est de nouveau actif"
+
+      - name: Cleanup réseau
+        if: always()
+        run: docker network rm spark-net || true
